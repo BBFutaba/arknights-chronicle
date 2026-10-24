@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>泰拉剧情浏览器</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/timeline">泰拉剧情浏览器</a>
+    <nav class="tabs" id="tabs">
+      <a href="#/timeline" data-view="timeline">时间轴</a>
+      <a href="#/story" data-view="story">剧情</a>
+      <a href="#/chars" data-view="chars">人物</a>
+      <a href="#/powers" data-view="powers">地区与势力</a>
+      <a href="#/graph" data-view="graph">关系图</a>
+    </nav>
+    <div class="search" id="search">
+      <input type="search" placeholder="搜索人物、地区、事件、剧情…" autocomplete="off">
+      <div class="search-results" hidden></div>
+    </div>
+    <button class="about-btn" id="about-btn" title="关于数据来源">关于</button>
+  </header>
+  <main id="view"><div class="loading">正在加载数据…</div></main>
+  <dialog id="about"></dialog>
+  <script src="vendor/cytoscape.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

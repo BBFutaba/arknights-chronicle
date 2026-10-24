@@ -1,0 +1,8 @@
+# 游戏解包数据和 PRTS 缓存（体积大，版权属于原作者，只留在本地）
+data/raw/
+# 中间产物和网页数据，可由 pipeline 重新生成；网页数据含剧本全文，不要提交
+data/structured/
+site/data/
+.obsidian/
+__pycache__/
+*.pyc
