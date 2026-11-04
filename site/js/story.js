@@ -8,7 +8,7 @@ export function mount(el, r) {
   root = el;
   el.innerHTML = `
     <aside class="side panel">
-      <div class="seg-ctrl">${['主线', '活动', '故事集'].map((c) => `<button data-cat="${c}">${c}</button>`).join('')}</div>
+      <div class="seg-ctrl">${['主线', '活动', '故事集', '干员密录'].map((c) => `<button data-cat="${c}">${c}</button>`).join('')}</div>
       <input type="search" class="st-q" placeholder="筛选剧情组…">
       <div class="list"></div>
     </aside>
@@ -29,7 +29,7 @@ export function update(r) {
   const g = D.groupById[gid] ?? D.groups[0];
   cat = g.category;
   renderList(g.id);
-  if (sid && D.epById[sid]) renderEpisode(sid);
+  if (sid && D.epById[sid]) renderEpisode(sid, parseLines(r.params.get('l')));
   else renderGroup(g);
   content.scrollTop = 0;
 }
@@ -76,7 +76,17 @@ function renderGroup(g) {
     ${evs.length ? `<h4>年表中的相关事件</h4>${evs.map(eventItem).join('')}` : ''}`;
 }
 
-async function renderEpisode(sid) {
+// ?l=12-18,20-22 → 要高亮的行号集合（编年史引文跳转过来时用）
+function parseLines(spec) {
+  const hl = new Set();
+  for (const part of (spec ?? '').split(',').filter(Boolean)) {
+    const [a, b = a] = part.split('-').map(Number);
+    for (let i = a; i <= b; i++) hl.add(i);
+  }
+  return hl;
+}
+
+async function renderEpisode(sid, hl = new Set()) {
   const { ep, group: g, index } = D.epById[sid];
   const prev = g.episodes[index - 1], next = g.episodes[index + 1];
   const nav = `<div class="reader-nav">
@@ -99,7 +109,9 @@ async function renderEpisode(sid) {
   const box = content.querySelector('.script');
   if (token !== renderToken || !box) return;  // 加载期间已跳到别的页面
   box.classList.remove('muted');
-  box.innerHTML = story[sid].lines.map(renderLine).join('');
+  box.innerHTML = story[sid].lines.map((ln, i) => renderLine(ln)
+    .replace('<div class="ln', `<div id="L${i + 1}" class="ln${hl.has(i + 1) ? ' hl' : ''}`)).join('');
+  if (hl.size) box.querySelector('.ln.hl')?.scrollIntoView({ block: 'center' });
 }
 
 function renderLine([k, sp, t]) {

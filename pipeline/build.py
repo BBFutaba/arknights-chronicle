@@ -1,7 +1,7 @@
 """构建入口：解析全部剧本和 PRTS 年表 → data/structured/episodes.jsonl 和 site/data/。
 
 用法（在项目根目录运行）：
-    python -m pipeline.build          构建全部主线、活动和故事集
+    python -m pipeline.build          构建全部主线、活动（含隐藏剧情）、故事集和干员密录
     python -m pipeline.build --list   列出所有剧情组 id
 构建完用 python -m pipeline.serve 在浏览器里打开。
 """
@@ -49,8 +49,14 @@ def main():
                 f.write(json.dumps(to_record(d, reg), ensure_ascii=False) + "\n")
 
     stats = SiteExporter(reg, groups, built, events, prts_meta, data_version()).export()
+    for cat, n_groups, n_eps, n_chars in stats["by_category"]:
+        print(f"  {cat}：{n_groups} 组 {n_eps} 集 {n_chars:,} 字")
     print(f"构建完成：{stats['groups']} 组 {stats['episodes']} 集，年表事件 {stats['events']} 条，"
           f"人物 {stats['characters']}，地区与势力 {stats['powers']} → {config.SITE_DATA}")
+    # 编年史的引文按行号取自刚导出的剧本，所以放在最后；有问题只提示，不影响网页数据
+    from . import annals
+    print("编年史：")
+    annals.build()
     print("在浏览器中查看：python -m pipeline.serve")
 
 

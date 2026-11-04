@@ -156,16 +156,33 @@ class SiteExporter:
     def export_events(self) -> dict:
         threads = {g.id: {"name": g.name, "category": g.category, "label": g.label} for g in self.groups}
         threads["lore"] = {"name": "设定与档案", "category": "设定", "label": ""}
+        # 故事线只取主线、活动、故事集；只出自干员密录的事件仍归「设定与档案」，出处里照样链到密录分集
+        story_line = {g.id for g in self.groups if g.category != gamedata.MEMORY}
         evs = []
         for e in self.events:
             evs.append({
                 "id": e.id, "era": e.era, "when": e.when, "year": e.year, "lines": e.lines,
                 "parallel": e.parallel, "notes": e.notes,
-                "thread": next(iter(e.group_ids), "lore"),
+                "thread": next((g for g in e.group_ids if g in story_line), "lore"),
                 "sources": [{"text": s.text, "groups": s.group_ids, "stories": s.story_ids} for s in e.sources],
                 "chars": self.ev_chars[e.id], "powers": self.ev_powers[e.id],
             })
         return {"threads": threads, "events": evs}
+
+    def category_stats(self) -> list:
+        """[[分类, 组数, 集数, 字数]]，字数是台词、旁白和选项的字符数（不含空白）。"""
+        out = {}
+        for g in self.groups:
+            row = out.setdefault(g.category, [g.category, 0, 0, 0])
+            row[1] += 1
+            for d in self.built[g.id]:
+                row[2] += 1
+                for l in d.script.lines:
+                    if l.kind in ("dialogue", "narration"):
+                        row[3] += sum(not c.isspace() for c in l.text)
+                    elif l.kind == "decision":
+                        row[3] += sum(not c.isspace() for o in l.options for c in o)
+        return list(out.values())
 
     def export(self) -> dict:
         if config.SITE_DATA.exists():
@@ -183,6 +200,7 @@ class SiteExporter:
         stats = {
             "groups": len(groups), "episodes": len(self.eps), "events": len(self.events),
             "characters": len(characters), "powers": len(powers),
+            "by_category": self.category_stats(),
         }
         dump(config.SITE_DATA / "meta.json", {
             "built_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "data_version": self.data_version,

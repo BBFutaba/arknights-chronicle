@@ -1,5 +1,5 @@
 // 入口：加载数据，按 hash 路由切换标签页。
-// 路由形如 #/timeline?ev=ev0541、#/story/main_1/<分集 id>、#/chars/阿米娅、#/powers/kazimierz、#/graph/char:陈
+// 路由形如 #/timeline?ev=ev0541、#/annals/1097?e=ev0536、#/story/main_1/<分集 id>?l=12-18、#/chars/阿米娅、#/powers/kazimierz、#/graph/char:陈
 import { D, loadAll } from './data.js';
 import { esc } from './util.js';
 import { initSearch } from './search.js';
@@ -8,8 +8,9 @@ import * as story from './story.js';
 import * as chars from './chars.js';
 import * as powers from './powers.js';
 import * as graph from './graph.js';
+import * as annals from './annals.js';
 
-const VIEWS = { timeline, story, chars, powers, graph };
+const VIEWS = { timeline, annals, story, chars, powers, graph };
 const view = document.getElementById('view');
 let current = null;
 

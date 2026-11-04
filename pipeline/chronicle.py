@@ -136,9 +136,24 @@ class StoryIndex:
     def __init__(self, groups: dict[str, gamedata.Group]):
         self.groups = groups
         self.by_name = {}
+        self.memory = {}  # 干员名 → 干员密录组 id
         for g in groups.values():
+            if g.category == gamedata.MEMORY:
+                # 密录组以干员名为名（「空」「林」「陈」……），不能参与出处标签的子串匹配
+                self.memory.setdefault(g.name, g.id)
+                continue
             self.by_name.setdefault(g.name, g.id)
         self.names = sorted(self.by_name, key=len, reverse=True)
+
+    def memory_episodes(self, target: str) -> list[gamedata.Episode] | None:
+        """[[伺夜/干员密录/2]]、[[暴行/干员密录/2-2]] → 分集；不是密录链接时返回 None。"""
+        m = gamedata.MEMORY_LINK_RE.match(target.strip())
+        if not m:
+            return None
+        gid = self.memory.get(m.group(1).strip())
+        if gid is None:
+            return []
+        return gamedata.memory_set(self.groups[gid], int(m.group(2)), int(m.group(3)) if m.group(3) else None)
 
     def group_from_label(self, label: str) -> list[str]:
         """「第九章 风暴瞭望」「孤星」「第十二章 惊霆无声、第十三章 恶兆湍流」→ 剧情组 id。"""
@@ -164,7 +179,7 @@ class StoryIndex:
         else:
             code, title = "", base
         pools = [[e for g in group_ids for e in self.groups[g].episodes]] if group_ids else []
-        pools.append([e for g in self.groups.values() for e in g.episodes])
+        pools.append([e for g in self.groups.values() if g.category != gamedata.MEMORY for e in g.episodes])
         for pool in pools:
             for match in (lambda e: code and e.code == code, lambda e: title and e.title == title):
                 hits = [e for e in pool if match(e)]
@@ -188,8 +203,10 @@ def parse_sources(raw: str, index: StoryIndex) -> list[Source]:
             if target.strip() == "剧情一览":
                 group_ids += [g for g in index.group_from_label(label) if g not in group_ids]
                 continue
-            eps = index.episodes(target, group_ids)
-            if not eps and STORY_LINK_RE.match(target.strip()):
+            eps = index.memory_episodes(target)
+            if eps is None:
+                eps = index.episodes(target, group_ids)
+            if not eps and (STORY_LINK_RE.match(target.strip()) or gamedata.MEMORY_LINK_RE.match(target.strip())):
                 unmatched.append(target.strip())
             for e in eps:
                 story_ids.append(e.story_id)

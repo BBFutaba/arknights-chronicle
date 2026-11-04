@@ -260,6 +260,7 @@ function renderDetail(ev) {
     <div class="muted small">${esc(ev.era)}</div>
     <div class="ev-tags">${ev.thread === 'lore' ? '<span class="thread-chip" style="--c:var(--lore)">设定与档案</span>' : threadChip(ev.thread, 'group')}${ev.parallel ? '<span class="badge">平行世界</span>' : ''}</div>
     <div class="ev-lines">${ev.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div>
+    ${D.annalsByEvent[ev.id] ? `<div class="actions"><a class="btn" href="${href.annalsEntry(D.annalsByEvent[ev.id])}">📜 编年史中的记述</a></div>` : ''}
     ${ev.notes.length ? `<div class="note">${ev.notes.map(esc).join('<br>')}</div>` : ''}
     ${ev.chars.length || ev.powers.length ? `<h4>涉及</h4><div class="chips">${ev.chars.map((n) => charChip(n)).join('')}${ev.powers.map((p) => powerChip(p)).join('')}</div>` : ''}
     ${filters ? `<h4>在时间轴中只看</h4><div class="filter-links">${filters}</div>` : ''}

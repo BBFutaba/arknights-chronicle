@@ -6,3 +6,7 @@ site/data/
 .obsidian/
 __pycache__/
 *.pyc
+# 编年史成品（含剧本原文），由 python -m pipeline.annals render 生成
+/annals/
+# 游戏原文的本地副本（TXT/EPUB/PDF，约 5GB，版权属于原作者）
+StoryText/

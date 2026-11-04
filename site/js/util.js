@@ -13,6 +13,9 @@ export const href = {
   event: (id) => `#/timeline?ev=${enc(id)}`,
   timeline: (params) => `#/timeline?${new URLSearchParams(params)}`,
   graph: (type, id) => `#/graph/${type}:${enc(id)}`,
+  annals: (year, entry) => `#/annals/${year}${entry ? `?e=${entry}` : ''}`,
+  annalsEntry: (id) => `#/annals/${D.annalsEntry[id]?.year ?? ''}?e=${id}`,
+  benmo: (title) => `#/annals/本末/${enc(title)}`,
 };
 
 export const KIND_LABEL = { operator: '干员', npc: 'NPC', doctor: '博士' };

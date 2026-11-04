@@ -2,6 +2,7 @@
 export const D = {
   meta: null, groups: [], groupById: {}, epById: {}, chars: {}, powers: {},
   events: [], eventById: {}, threads: {},
+  annals: null, annalsEntry: {}, annalsByEvent: {}, benmoByTitle: {},
 };
 
 async function json(path) {
@@ -22,6 +23,15 @@ export async function loadAll() {
     g.episodes.forEach((e, i) => { D.epById[e.id] = { ep: e, group: g, index: i }; });
   });
   ev.events.forEach((e, i) => { e.order = i; D.eventById[e.id] = e; });
+  // 编年史是可选的：还没运行 python -m pipeline.annals build 时没有这个文件
+  D.annals = await json('data/annals.json').catch(() => null);
+  for (const v of D.annals?.volumes ?? []) {
+    for (const s of v.sections) for (const d of s.days) for (const e of d.entries) {
+      D.annalsEntry[e.id] = e;
+      e.ids.forEach((i) => { D.annalsByEvent[i] = e.id; });
+    }
+  }
+  for (const b of D.annals?.benmo ?? []) D.benmoByTitle[b.title] = b;
 }
 
 const storyCache = {};

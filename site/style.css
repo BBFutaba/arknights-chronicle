@@ -222,6 +222,58 @@ details[open] > summary { color: var(--text); }
 .section { margin-top: 18px; }
 .tree-children { margin-left: 14px; border-left: 1px solid var(--line); padding-left: 4px; }
 
+/* ---------------------------------------------------------------- 编年史 */
+.an-side .an-toc { padding-left: 22px; font-size: 13px; }
+.an-body { max-width: 860px; margin: 0 auto; }
+.an-body > h1 { font-size: 26px; letter-spacing: .04em; }
+.an-controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }
+.an-sec > h2 {
+  position: sticky; top: -22px; z-index: 1; margin: 26px 0 4px; padding: 8px 0 6px;
+  font-size: 20px; color: var(--accent); background: var(--panel); border-bottom: 2px solid var(--accent);
+}
+.an-day { font-size: 15px; color: var(--muted); margin: 20px 0 2px; }
+.an-entry { padding: 12px 0 14px; border-bottom: 1px dashed var(--line); scroll-margin-top: 40px; }
+.an-entry.flash { animation: an-flash 2.4s ease-out; }
+@keyframes an-flash { 0%, 30% { background: var(--sel); } 100% { background: transparent; } }
+.an-group + .an-group { margin-top: 16px; padding-top: 12px; border-top: 1px dotted var(--line); }
+.an-gang { font-size: 15.5px; line-height: 1.75; border-left: 3px solid var(--accent); padding-left: 10px; margin-bottom: 6px; }
+.an-gang strong { font-weight: 650; }
+.an-mu { font-size: 14.5px; line-height: 1.95; text-indent: 2em; margin: 6px 0; }
+.an-p { color: var(--c-operator); }
+.an-people { margin: 8px 0; }
+.an-people .chip { font-size: 12px; }
+.an-quote { margin: 10px 0; padding: 8px 14px 6px; background: var(--panel-2); border-left: 3px solid var(--line); border-radius: 0 8px 8px 0; font-size: 13.5px; }
+.ql { line-height: 1.75; }
+.ql.d { display: grid; grid-template-columns: max-content 1fr; }
+.ql .sp { font-weight: 600; }
+.ql .sp::after { content: "："; }
+.ql.c .sp { color: var(--accent); }
+.ql.n { color: var(--muted); font-style: italic; }
+.ql.gap { color: var(--muted); }
+.ql.s { color: var(--c-region); font-size: 12.5px; }
+.ql.pr { margin: 0 0 .4em; text-indent: 2em; }
+.an-quote cite { display: block; text-align: right; font-style: normal; font-size: 12.5px; margin-top: 4px; }
+.an-quote cite a { color: var(--accent); }
+.an-kaoyi { margin: 8px 0 2px; font-size: 13px; }
+.an-kaoyi > summary { font-size: 12.5px; }
+.an-kaoyi p { margin: 4px 0; }
+.an-kaoyi ul { margin: 4px 0; padding-left: 1.4em; }
+.an-kaoyi li { margin: 2px 0; }
+.an-meta { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.an-meta a { color: var(--accent); }
+.an-meta .dot { margin: 0 6px; }
+.an-when { font-weight: 650; color: var(--accent); margin-bottom: 4px; }
+.an-summary p { margin: 0 0 .5em; text-indent: 2em; line-height: 1.9; }
+.an-index ol { margin: 6px 0 0; padding-left: 1.6em; font-size: 13px; }
+.an-index li { margin: 3px 0; }
+.an-index .when { color: var(--muted); margin-right: 8px; font-size: 12px; }
+.an-index strong { font-weight: 500; }
+.an-fanli li { margin: 6px 0; line-height: 1.8; }
+.gang-only .an-mu, .gang-only .an-people, .gang-only .an-quote, .gang-only .an-kaoyi, .gang-only .an-meta { display: none; }
+.gang-only .an-entry { padding: 6px 0; border-bottom: none; }
+.gang-only .an-group + .an-group { margin-top: 4px; padding-top: 4px; border-top: none; }
+.ln.hl { background: var(--sel); border-radius: 4px; }
+
 /* ---------------------------------------------------------------- 关系图 */
 .graph-side { width: 260px; }
 .graph-main { flex: 1; min-width: 0; position: relative; }
