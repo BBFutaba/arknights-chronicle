@@ -277,7 +277,11 @@ details[open] > summary { color: var(--text); }
 /* ---------------------------------------------------------------- 关系图 */
 .graph-side { width: 260px; }
 .graph-main { flex: 1; min-width: 0; position: relative; }
-#cy { position: absolute; inset: 0; }
+#fg { position: absolute; inset: 0; overflow: hidden; }
+.g-forces { font-size: 13px; }
+.g-forces .range-row { margin: 4px 0; }
+.g-f-label { width: 4.5em; flex: none; color: var(--muted); }
+.g-f-v { width: 2.8em; text-align: right; font-weight: 500; font-size: 12px; }
 .graph-info { position: absolute; right: 12px; top: 12px; width: 280px; max-height: calc(100% - 24px); overflow: auto; padding: 14px; box-shadow: var(--shadow); }
 .legend { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
