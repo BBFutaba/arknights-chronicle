@@ -2,7 +2,7 @@
 export const D = {
   meta: null, groups: [], groupById: {}, epById: {}, chars: {}, powers: {},
   events: [], eventById: {}, threads: {},
-  annals: null, annalsEntry: {}, annalsByEvent: {}, benmoByTitle: {},
+  annals: null, annalsEntry: {}, annalsByEvent: {}, benmoByTitle: {}, zhuanByName: {}, annalsByPerson: {},
 };
 
 async function json(path) {
@@ -29,9 +29,12 @@ export async function loadAll() {
     for (const s of v.sections) for (const d of s.days) for (const e of d.entries) {
       D.annalsEntry[e.id] = e;
       e.ids.forEach((i) => { D.annalsByEvent[i] = e.id; });
+      const people = new Set(e.groups.flatMap((g) => g.people.flatMap((t) => [...t.matchAll(/\[\[([^\]|]+)/g)].map((m) => m[1]))));
+      people.forEach((n) => (D.annalsByPerson[n] ??= []).push(e.id));
     }
   }
   for (const b of D.annals?.benmo ?? []) D.benmoByTitle[b.title] = b;
+  for (const z of D.annals?.liezhuan ?? []) D.zhuanByName[z.name] = z;
 }
 
 const storyCache = {};

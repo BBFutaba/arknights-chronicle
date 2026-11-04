@@ -84,6 +84,7 @@ function renderProfile(name) {
     <div class="actions">
       ${evs.length ? `<a class="btn" href="${href.timeline({ char: name })}">在时间轴中查看（${evs.length} 条事件）</a>` : ''}
       <a class="btn" href="${href.graph('char', name)}">在关系图中查看</a>
+      ${D.zhuanByName[name]?.entries.length ? `<a class="btn" href="${href.zhuan(name)}">📜 ${esc(name)}传</a>` : ''}
     </div>
     ${c.powers.length ? `<h4>所属</h4><div class="chips">${c.powers.map((p) => powerChip(p)).join('')}</div>` : ''}
     ${c.description ? `<h4>敌人图鉴</h4><p>${esc(c.description)}</p>` : ''}
@@ -102,7 +103,22 @@ function renderProfile(name) {
       </div>
       <div>
         ${c.co.length ? `<h4>常同场人物（共同出场集数）</h4><div class="chips">${c.co.map(([n, k]) => charChip(n, `<span class="n">${k}</span>`)).join('')}</div>` : ''}
+        ${annalsSection(name)}
         ${evs.length ? `<h4>年表中的相关事件（${evs.length}）</h4>${evs.map(eventItem).join('')}` : ''}
       </div>
     </div>`;
+}
+
+// 编年史中写到此人的条目（【人物】里有他的）；立了传的另有按钮
+function annalsSection(name) {
+  const ids = D.annalsByPerson[name] ?? [];
+  if (!ids.length) return '';
+  const item = (id) => {
+    const e = D.annalsEntry[id];
+    return `<a class="event-item" href="${href.annalsEntry(id)}"><span class="when">${esc(e.when.replace('结晶纪元', ''))}</span>
+      <span></span><span class="text">${esc(e.groups[0].gang.replace(/\*\*/g, ''))}</span></a>`;
+  };
+  const head = ids.slice(0, 8).map(item).join('');
+  const rest = ids.length > 8 ? `<details><summary>其余 ${ids.length - 8} 条</summary>${ids.slice(8).map(item).join('')}</details>` : '';
+  return `<h4>编年史中的记述（${ids.length}）</h4>${head}${rest}`;
 }

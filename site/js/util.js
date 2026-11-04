@@ -16,6 +16,7 @@ export const href = {
   annals: (year, entry) => `#/annals/${year}${entry ? `?e=${entry}` : ''}`,
   annalsEntry: (id) => `#/annals/${D.annalsEntry[id]?.year ?? ''}?e=${id}`,
   benmo: (title) => `#/annals/本末/${enc(title)}`,
+  zhuan: (name) => `#/annals/传/${enc(name)}`,
 };
 
 export const KIND_LABEL = { operator: '干员', npc: 'NPC', doctor: '博士' };

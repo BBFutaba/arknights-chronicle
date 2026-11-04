@@ -1,6 +1,6 @@
 // 编年史：左侧是卷目、月份和纪事本末，右侧按卷或按事连读。考异默认折叠。
 // 路由：#/annals/1097（一卷）、#/annals/1097?e=ev0536（跳到某条）、#/annals/1097?s=正月（跳到某月）、
-//      #/annals/本末/<事名>（纪事本末）、#/annals/凡例
+//      #/annals/本末/<事名>（纪事本末）、#/annals/传/<人物>（列传）、#/annals/凡例
 import { D } from './data.js';
 import { esc, href, charChip } from './util.js';
 
@@ -25,12 +25,13 @@ export function update(r) {
   const [a, b] = r.parts;
   let vol = null;
   if (a === '本末' && D.benmoByTitle[b]) renderBenmo(D.benmoByTitle[b]);
+  else if (a === '传' && D.zhuanByName[b]) renderZhuan(D.zhuanByName[b]);
   else if (a === '凡例') renderFanli();
   else {
     vol = D.annals.volumes.find((v) => String(v.year) === a) ?? D.annals.volumes[0];
     renderVolume(vol);
   }
-  renderSide(vol, a === '本末' ? b : a === '凡例' ? '凡例' : null);
+  renderSide(vol, a === '本末' ? b : a === '传' ? `传:${b}` : a === '凡例' ? '凡例' : null);
   jump(r.params, vol);
 }
 
@@ -45,16 +46,22 @@ function renderSide(vol, activeOther) {
     const active = vol && v.year === vol.year;
     const toc = active ? v.sections.map((s) => `
       <a class="list-item an-toc" href="#/annals/${v.year}?s=${encodeURIComponent(s.label)}">
-        <span class="grow">${esc(s.label)}</span><span class="n">${countGang(s)}</span></a>`).join('') : '';
+        <span class="grow">${esc(s.label)}</span><span class="n">${countGang(s)}</span></a>`).join('')
+      + (v.cunmu?.length ? `<a class="list-item an-toc" href="#/annals/${v.year}?s=存目">
+        <span class="grow muted">存目</span><span class="n">${v.cunmu.length}</span></a>` : '') : '';
     return `<a class="list-item${active ? ' active' : ''}" href="${href.annals(v.year)}">
         <span class="grow">${esc(v.title.replace('结晶纪元', ''))}</span><span class="n">${v.stats.gang} 纲</span></a>${toc}`;
   }).join('');
   const benmo = D.annals.benmo.map((b) => `
     <a class="list-item${activeOther === b.title ? ' active' : ''}" href="${href.benmo(b.title)}">
       <span class="grow">${esc(b.title)}</span><span class="n">${b.entries.length} 条</span></a>`).join('');
+  const zhuan = (D.annals.liezhuan ?? []).filter((z) => z.entries.length).map((z) => `
+    <a class="list-item${activeOther === `传:${z.name}` ? ' active' : ''}" href="${href.zhuan(z.name)}">
+      <span class="grow">${esc(z.name)}传</span><span class="n">${z.entries.length} 条</span></a>`).join('');
   side.innerHTML = `
     <div class="list-head">编年 · 按年</div>${vols}
     ${benmo ? `<div class="list-head">纪事本末 · 按事</div>${benmo}` : ''}
+    ${zhuan ? `<div class="list-head">列传 · 按人</div>${zhuan}` : ''}
     <div class="list-head">说明</div>
     <a class="list-item${activeOther === '凡例' ? ' active' : ''}" href="#/annals/凡例"><span class="grow">凡例</span></a>`;
 }
@@ -80,6 +87,11 @@ function renderVolume(v) {
         <h2>${esc(s.label)}</h2>
         ${s.days.map((d) => `${d.label ? `<h3 class="an-day">${esc(d.label)}</h3>` : ''}${d.entries.map((e) => entryHtml(e)).join('')}`).join('')}
       </section>`).join('')}
+    ${v.cunmu?.length ? `<section class="an-sec an-cunmu" id="${secId(v.year, '存目')}"><h2>存目</h2>
+      <p class="muted small">以下年表事件于人于事没有推力，不入正文，只存其目。</p>
+      <ol>${v.cunmu.map((c) => `<li id="an-${c.id}"><span class="when">${esc(c.prts)}</span>${inline(c.gang)}
+        ${c.kaoyi.length ? `<div class="small muted">${c.kaoyi.map((k) => inline(k.text)).join(' ')}</div>` : ''}</li>`).join('')}</ol>
+    </section>` : ''}
     <div class="reader-nav">
       ${prev ? `<a class="btn" href="${href.annals(prev.year)}">← ${esc(prev.title)}</a>` : '<span></span>'}
       ${next ? `<a class="btn" href="${href.annals(next.year)}">${esc(next.title)} →</a>` : '<span></span>'}
@@ -101,6 +113,27 @@ function renderBenmo(b) {
       <ol>${entries.map((e) => e.groups.map((g) => `
         <li><a href="${href.benmo(b.title)}?e=${e.id}"><span class="when">${esc(e.when)}</span>${inline(g.gang)}</a></li>`).join('')).join('')}</ol>
     </details>
+    ${controls()}
+    ${entries.map((e) => entryHtml(e, true)).join('')}
+  </div>`;
+  wireControls();
+}
+
+function renderZhuan(z) {
+  const key = `zhuan:${z.name}`;
+  if (shown === key) return;
+  shown = key;
+  const entries = z.entries.map(({ id }) => D.annalsEntry[id]).filter(Boolean);
+  const others = z.others.map(({ id }) => D.annalsEntry[id]).filter(Boolean);
+  content.innerHTML = `<div class="an-body">
+    <div class="sub">列传</div>
+    <h1>${esc(z.name)}传</h1>
+    <div class="sub">${z.span ? `${esc(z.span[0])}${z.span[1] !== z.span[0] ? ` 至 ${esc(z.span[1])}` : ''} · ` : ''}${entries.length} 条
+      · <a href="${href.char(z.name)}">人物页</a></div>
+    ${z.summary.length ? `<div class="synopsis an-summary">${z.summary.map((p) => `<p>${inline(p)}</p>`).join('')}</div>` : ''}
+    ${others.length ? `<details class="an-index"><summary>其他出场（${others.length} 条）</summary>
+      <ol>${others.map((e) => `<li><a href="${href.annals(e.year, e.id)}"><span class="when">${esc(e.when)}</span>${inline(e.groups[0].gang)}</a></li>`).join('')}</ol>
+    </details>` : ''}
     ${controls()}
     ${entries.map((e) => entryHtml(e, true)).join('')}
   </div>`;
@@ -162,16 +195,28 @@ function entryHtml(e, withWhen = false) {
   const evLinks = e.ids.filter((i) => D.eventById[i])
     .map((i) => `<a href="${href.event(i)}">时间轴：${esc(D.eventById[i].when)}</a>`);
   const benmo = e.benmo.map((t) => `<a href="${href.benmo(t)}">纪事本末：${esc(t)}</a>`);
+  const moved = e.moved ? [`<span class="an-moved" title="原文另有依据，见考异">PRTS 系于 ${esc(e.moved)}，今改系</span>`]
+    : e.sup ? ['<span class="an-moved" title="年表未列，据原文补立">补条：年表不载</span>'] : [];
+  benmo.push(...(e.zhuan ?? []).map((n) => `<a href="${href.zhuan(n)}">列传：${esc(n)}传</a>`));
+  if (e.minor) {
+    // 附记：只有纲和考异，小字附在当日
+    return `<article class="an-entry minor" id="an-${e.id}">
+      ${withWhen ? `<div class="an-when"><a href="${href.annals(e.year, e.id)}">${esc(e.when)}</a></div>` : ''}
+      ${e.groups.map((g) => `<div class="an-gang"><span class="an-tag">附</span>${inline(g.gang)}</div>${kaoyiHtml(g.kaoyi)}`).join('')}
+      <div class="an-meta">${[...moved, ...evLinks, ...benmo].join('<span class="dot">·</span>')}</div>
+    </article>`;
+  }
   return `<article class="an-entry" id="an-${e.id}">
     ${withWhen ? `<div class="an-when"><a href="${href.annals(e.year, e.id)}">${esc(e.when)}</a></div>` : ''}
     ${e.groups.map((g) => `<div class="an-group">
       <div class="an-gang">${inline(g.gang)}</div>
       ${g.mu.map((p) => `<p class="an-mu">${inline(p)}</p>`).join('')}
       ${g.people.length ? `<div class="chips an-people">${g.people.map(personChip).join('')}</div>` : ''}
+      ${g.intro?.length ? `<div class="an-intro">${g.intro.map((i) => `<div><span class="an-tag">初见</span>${inline(`[[${i.name}]]`)}：${inline(i.text)}</div>`).join('')}</div>` : ''}
       ${g.quotes.map(quoteHtml).join('')}
       ${kaoyiHtml(g.kaoyi)}
     </div>`).join('')}
-    <div class="an-meta">${[...evLinks, ...benmo].join('<span class="dot">·</span>')}</div>
+    <div class="an-meta">${[...moved, ...evLinks, ...benmo].join('<span class="dot">·</span>')}</div>
   </article>`;
 }
 

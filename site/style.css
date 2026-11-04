@@ -242,6 +242,8 @@ details[open] > summary { color: var(--text); }
 .an-p { color: var(--c-operator); }
 .an-people { margin: 8px 0; }
 .an-people .chip { font-size: 12px; }
+.an-intro { font-size: 12.5px; color: var(--muted); margin: -2px 0 8px; line-height: 1.8; }
+.an-intro .an-p { font-weight: 600; }
 .an-quote { margin: 10px 0; padding: 8px 14px 6px; background: var(--panel-2); border-left: 3px solid var(--line); border-radius: 0 8px 8px 0; font-size: 13.5px; }
 .ql { line-height: 1.75; }
 .ql.d { display: grid; grid-template-columns: max-content 1fr; }
@@ -263,6 +265,17 @@ details[open] > summary { color: var(--text); }
 .an-meta a { color: var(--accent); }
 .an-meta .dot { margin: 0 6px; }
 .an-when { font-weight: 650; color: var(--accent); margin-bottom: 4px; }
+.an-entry.minor { padding: 6px 0 8px; }
+.an-entry.minor .an-gang { font-size: 13.5px; border-left: none; padding-left: 0; color: var(--muted); margin-bottom: 0; }
+.an-entry.minor .an-gang strong { font-weight: 500; }
+.an-entry.minor .an-meta { margin-top: 2px; }
+.an-tag { display: inline-block; font-size: 11px; line-height: 17px; padding: 0 5px; margin-right: 6px; border-radius: 4px;
+  border: 1px solid var(--line); color: var(--muted); vertical-align: 1px; }
+.an-moved { color: var(--c-faction); }
+.an-cunmu ol { padding-left: 1.6em; font-size: 13.5px; }
+.an-cunmu li { margin: 8px 0; }
+.an-cunmu .when { color: var(--muted); font-size: 12px; margin-right: 8px; }
+.an-cunmu strong { font-weight: 500; }
 .an-summary p { margin: 0 0 .5em; text-indent: 2em; line-height: 1.9; }
 .an-index ol { margin: 6px 0 0; padding-left: 1.6em; font-size: 13px; }
 .an-index li { margin: 3px 0; }
