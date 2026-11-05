@@ -59,6 +59,8 @@ class Registry:
             cur = tomllib.load(f)
         sp = cur.get("speakers", {})
         self.aliases: dict[str, str] = {**cur.get("aliases", {}), **_book_aliases()}
+        # 同名不同人：这些干员 id 归到别的干员名下，名字留给剧本里的同名说话人
+        self.op_owner: dict[str, str] = cur.get("operator_owner", {})
         self.ignore = set(sp.get("ignore", []))
         self.generic_suffixes = tuple(sp.get("generic_suffixes", []))
         self.keep = set(sp.get("keep", []))
@@ -96,7 +98,7 @@ class Registry:
     def _load_operators(self):
         table = gamedata.excel("character_table")
         ops = [(cid, c) for cid, c in table.items()
-               if cid.startswith("char_") and c.get("profession") in PROFESSIONS]
+               if cid.startswith("char_") and c.get("profession") in PROFESSIONS and cid not in self.op_owner]
         for cid, c in ops:
             if not c.get("isSpChar"):
                 self._register_operator(cid, c, self.op_by_name.get(c["name"]) or self._operator(c))
@@ -113,6 +115,9 @@ class Registry:
             else:
                 ch = self.op_by_name.get(c["name"]) or self._operator(c)
             self._register_operator(cid, c, ch)
+        for cid, owner in self.op_owner.items():
+            self._register_operator(cid, table[cid], self.op_by_name[owner])
+            del self.op_by_name[table[cid]["name"]]
         for alias, target in self.aliases.items():
             self._merge_alias(alias, target)
 

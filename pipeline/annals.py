@@ -220,6 +220,8 @@ def profile_quote(args: str, where: str, probs: Problems) -> dict | None:
     name, section, rest = m.groups()
     ch = characters().get(canon(name))
     secs = {s["title"]: s["text"] for s in (ch or {}).get("profile", {}).get("sections", [])} if ch else {}
+    if section not in secs and f"{name}·{section}" in secs:  # 合并进来的另一身份，栏目名前加了名字
+        section = f"{name}·{section}"
     if section not in secs:
         probs.add(where, f"{name} 没有档案栏目「{section}」")
         return None
