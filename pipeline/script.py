@@ -110,8 +110,11 @@ def parse_script(text: str) -> Script:
         if cmd in ("name", "multiline"):
             speaker = clean_text(p.get("name", ""))
             say("dialogue" if speaker else "narration", rest, speaker or None)
-        elif cmd in ("narration", "title", "avatarid"):
+        elif cmd in ("narration", "title", "avatarid", "isavatarright"):
             say("narration", rest)
+        elif cmd in ("dialog", "popupdialog"):
+            # 集成战略月度记录、活动任务和访谈的对白，说话人写在 head 里（char_xxx 或 npc_xxx）
+            say("dialogue", rest, p.get("head") or ("查访者" if p.get("style") == "ask" else None))
         elif cmd == "voicewithin":
             say("dialogue", rest, None)
         elif cmd in ("subtitle", "sticker"):

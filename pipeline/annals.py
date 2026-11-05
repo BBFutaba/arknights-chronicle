@@ -218,7 +218,7 @@ def profile_quote(args: str, where: str, probs: Problems) -> dict | None:
         probs.add(where, f"@档 格式不对：{args}")
         return None
     name, section, rest = m.groups()
-    ch = characters().get(name)
+    ch = characters().get(canon(name))
     secs = {s["title"]: s["text"] for s in (ch or {}).get("profile", {}).get("sections", [])} if ch else {}
     if section not in secs:
         probs.add(where, f"{name} 没有档案栏目「{section}」")
@@ -773,6 +773,8 @@ def load_liezhuan(probs: Problems) -> list[dict]:
                 probs.add(f"列传.md:{no}", f"人物页里没有「{out[-1]['name']}」，名字要与网页人物页一致")
         elif not out:
             continue  # 文件开头的说明
+        elif s.startswith("<!--"):
+            continue
         elif s.startswith("@"):
             probs.add(f"列传.md:{no}", f"不认识的指令：{s[:10]}")
         elif s:

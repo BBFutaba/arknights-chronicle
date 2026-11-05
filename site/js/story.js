@@ -8,7 +8,7 @@ export function mount(el, r) {
   root = el;
   el.innerHTML = `
     <aside class="side panel">
-      <div class="seg-ctrl">${['主线', '活动', '故事集', '干员密录'].map((c) => `<button data-cat="${c}">${c}</button>`).join('')}</div>
+      <div class="seg-ctrl">${['主线', '活动', '故事集', '干员密录', '集成战略', '生息演算', '其他文本'].map((c) => `<button data-cat="${c}">${c}</button>`).join('')}</div>
       <input type="search" class="st-q" placeholder="筛选剧情组…">
       <div class="list"></div>
     </aside>
@@ -60,7 +60,7 @@ function renderGroup(g) {
   const evs = g.events.map((id) => D.eventById[id]);
   content.innerHTML = `
     <h1>${esc(g.name)}</h1>
-    <div class="sub">${esc(g.category)} · ${g.chapter != null ? esc(g.label) : `${esc(g.date ?? '')} 开放`} · 共 ${g.episodes.length} 集</div>
+    <div class="sub">${esc(g.category)} · ${g.chapter != null ? esc(g.label) : (g.date ? `${esc(g.date)} 开放` : '不限时')} · 共 ${g.episodes.length} 集</div>
     <div class="actions">
       <a class="btn" href="${href.ep(g.episodes[0].id)}">从第一集开始读</a>
       ${evs.length ? `<a class="btn" href="${href.timeline({ thread: g.id })}">在时间轴中查看（${evs.length} 条事件）</a>` : ''}

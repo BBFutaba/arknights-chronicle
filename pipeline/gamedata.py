@@ -3,6 +3,7 @@
 剧情组有三个来源：
     story_review_table        主线、活动、故事集（剧情回顾里能看到的部分）
     handbook_info_table       干员密录：每位干员的密录归一个组，组 id 用干员 id（char_xxx）
+    load_extra_groups         剧情回顾之外的文本：集成战略、生息演算、记录点、活动里的任务和手册
     story_review_meta_table   活动档案里的隐藏剧情（如《长夜临光》的「逃离」），并入所属活动组
 """
 import json
@@ -18,7 +19,9 @@ CN_TZ = timezone(timedelta(hours=8))
 # story_review_table 的 entryType → vault 里的分类；NONE 类就是干员密录，改从 handbook_info_table 读
 CATEGORIES = {"MAINLINE": "主线", "ACTIVITY": "活动", "MINI_ACTIVITY": "故事集"}
 MEMORY = "干员密录"
-CATEGORY_ORDER = [*CATEGORIES.values(), MEMORY]
+ROGUE, SANDBOX, OTHER = "集成战略", "生息演算", "其他文本"
+EXTRA_CATEGORIES = (ROGUE, SANDBOX, OTHER)
+CATEGORY_ORDER = [*CATEGORIES.values(), MEMORY, *EXTRA_CATEGORIES]
 
 
 @dataclass
@@ -73,6 +76,7 @@ def load_groups() -> dict[str, Group]:
     groups = load_review_groups()
     add_hidden_stories(groups)
     groups.update(load_memory_groups())
+    groups.update(load_extra_groups(groups))
     return groups
 
 
@@ -167,6 +171,144 @@ def load_memory_groups() -> dict[str, Group]:
                 ))
         if grp.episodes:
             groups[cid] = grp
+    return groups
+
+
+def _walk(v):
+    if isinstance(v, dict):
+        yield v
+        for x in v.values():
+            yield from _walk(x)
+    elif isinstance(v, list):
+        for x in v:
+            yield from _walk(x)
+
+
+def _extra_titles() -> dict[str, str]:
+    """数据表里给这些文本起的名字：相对 story/ 的小写路径 → 标题。"""
+    titles = {}
+    for d in _walk(excel("roguelike_topic_table")):
+        if "clientEndbookItemDatas" in d:
+            head = d.get("title") or ""
+            if d.get("avgId"):
+                titles[d["avgId"].lower()] = f"结局 · {head}"
+            for it in d["clientEndbookItemDatas"] or []:
+                if it.get("textId"):
+                    titles[it["textId"].lower()] = f"{head} · {it.get('endbookName') or ''}"
+        elif d.get("chatStoryId"):
+            titles[d["chatStoryId"].lower()] = d.get("chatDesc") or ""
+    for d in _walk(excel("sandbox_perm_table")):
+        if d.get("avgId") and d.get("avgName"):
+            titles[d["avgId"].lower()] = d["avgName"]
+    for d in _walk(excel("story_review_meta_table")):
+        if d.get("textId") and d.get("titleName"):
+            titles[d["textId"].lower()] = d["titleName"]
+    for d in _walk(excel("activity_table")):
+        if d.get("investNpcName") and d.get("storyId"):
+            titles[d["storyId"].lower()] = f"访谈 · {d['investNpcName']}"
+    for d in _walk(excel("zone_table")):
+        if d.get("textPath") and d.get("bindStageId"):
+            titles[d["textPath"].lower()] = f"记录点 · {d['bindStageId'].removeprefix('main_')}"
+    return titles
+
+
+_EXTRA_SKIP = re.compile(r"/(training|guide|tutorial|uiavg|traininglevel|level)/|tutorial_|/guide_|/training_|_entry_tr")
+
+
+def _extra_group_of(rel: str) -> tuple[str, str, str] | None:
+    """按路径归组：(组 id, 组名, 分类)；不是剧情的返回 None。"""
+    low = rel.lower()
+    if _EXTRA_SKIP.search(low):
+        return None
+    if m := re.match(r"obt/rogue/(?:rogue_(\d)/|month_chat_rogue_(\d)_)", low):
+        n = m[1] or m[2]
+    elif m := re.match(r"obt/roguelike/ro(\d)/level_rogue", low):
+        n = m[1]
+    else:
+        n = None
+    if n:
+        gid = f"rogue_{n}"
+        return gid, f"集成战略 · {excel('roguelike_topic_table')['topics'][gid]['name']}", ROGUE
+    if low.startswith("activities/act1sandbox/"):
+        return "sandbox_0", "生息演算 · 沙中之火", SANDBOX
+    if m := re.match(r"obt/sandboxperm/sandbox_(\d)/", low):
+        return f"sandbox_{m[1]}", {"1": "生息演算 · 沙洲遗闻", "2": "生息演算 · 重启锚点"}.get(m[1], m[1]), SANDBOX
+    if m := re.match(r"obt/record/main_(\d+)/", low):
+        return f"record_main_{m[1]}", f"第 {m[1]} 章记录点", OTHER
+    if low.startswith("activities/act21side/task/"):
+        return "act21side_task", "叙拉古人 · 任务文本", OTHER
+    if re.match(r"activities/act29side/(chat_|mark/)", low):
+        return "act29side_extra", "崔林特尔梅之金 · 访谈与手册", OTHER
+    if low.startswith("activities/act42side/mark/"):
+        return "act42side_mark", f"{excel('story_review_table')['act42side']['name']} · 物证", OTHER
+    if m := re.match(r"activities/(act4fun|act3fun|act5fun|act7fun|act1lock|act5d1|act12d6|act17d7)/", low):
+        name = excel("activity_table")["basicInfo"].get(m[1], {}).get("name") or m[1]
+        return m[1], f"{name} · {m[1]}" if "fun" in m[1] or "d7" in m[1] else name, OTHER
+    return None
+
+
+@cache
+def _avatar_names() -> dict[str, str]:
+    """对白 head 里的头像 id → 人名：《叙拉古人》的角色卡，加上该活动剧本里头像后面紧跟的说话人。"""
+    names = {}
+    for d in _walk(excel("activity_table")):
+        if d.get("avgChar") and d.get("charCardName"):
+            names[re.sub(r"^avg_|#.*$", "", d["avgChar"])] = d["charCardName"]
+    votes: dict[str, dict[str, int]] = {}
+    for f in (config.STORY / "activities" / "act21side").glob("level_*.txt"):
+        last = None
+        for line in f.read_text(encoding="utf-8-sig").splitlines():
+            if m := re.match(r'\[Character\(name="avg_(npc_[^"#$]+)', line, re.I):
+                last = m[1]
+            elif m := re.match(r'\[name="([^"]+)"\]', line):
+                if last and "？" not in m[1]:
+                    v = votes.setdefault(last, {})
+                    v[m[1]] = v.get(m[1], 0) + 1
+                last = None
+    for k, v in votes.items():  # 同一头像常被多人共用，只取几乎只有一个人用的
+        top = max(v, key=v.get)
+        if v[top] >= 50 and v[top] >= 0.8 * sum(v.values()):
+            names.setdefault(k, top)
+    return names
+
+
+def head_name(head: str) -> str | None:
+    """dialog 指令的 head（char_xxx、npc_4065_judge_1、npc_694_1）→ 说话人名，认不出返回 None。"""
+    chars = excel("character_table")
+    if head in chars:
+        return chars[head]["name"]
+    names = _avatar_names()
+    if got := names.get(head) or names.get(head.removeprefix("npc_")):
+        return got
+    if m := re.fullmatch(r"npc_(\d+_[a-z0-9]+)_\d+", head):
+        if (cid := f"char_{m[1]}") in chars:
+            return chars[cid]["name"]
+    return None
+
+
+def _natural(rel: str) -> list:
+    return [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", rel.lower())]
+
+
+def load_extra_groups(existing: dict[str, Group]) -> dict[str, Group]:
+    """剧情回顾之外、数据里有的文本。排序按路径；分集 id 是「组 id_文件名」，不影响原有分集。"""
+    used = {e.txt.lower() for g in existing.values() for e in g.episodes}
+    titles = _extra_titles()
+    groups: dict[str, Group] = {}
+    rels = [f.relative_to(config.STORY).with_suffix("").as_posix() for f in config.STORY.rglob("*.txt")]
+    for rel in sorted(rels, key=_natural):
+        if rel.lower() in used or not (got := _extra_group_of(rel)):
+            continue
+        text = read_story(rel)
+        if not re.search(r"[一-鿿]", re.sub(r"\[[^\]]*\]", "", text)):
+            continue
+        gid, name, category = got
+        grp = groups.setdefault(gid, Group(gid, name, category, None))
+        stem = rel.rsplit("/", 1)[-1]
+        sid = f"{gid}_{stem}"
+        if any(e.story_id == sid for e in grp.episodes):
+            sid = f"{gid}_{rel.replace('/', '_')}"
+        grp.episodes.append(Episode(sid, gid, "", titles.get(rel.lower()) or stem, "文本", len(grp.episodes) + 1, rel, None))
     return groups
 
 

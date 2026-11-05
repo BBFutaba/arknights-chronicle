@@ -157,7 +157,7 @@ class SiteExporter:
         threads = {g.id: {"name": g.name, "category": g.category, "label": g.label} for g in self.groups}
         threads["lore"] = {"name": "设定与档案", "category": "设定", "label": ""}
         # 故事线只取主线、活动、故事集；只出自干员密录的事件仍归「设定与档案」，出处里照样链到密录分集
-        story_line = {g.id for g in self.groups if g.category != gamedata.MEMORY}
+        story_line = {g.id for g in self.groups if g.category in gamedata.CATEGORIES.values()}
         evs = []
         for e in self.events:
             evs.append({

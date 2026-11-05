@@ -142,6 +142,8 @@ class StoryIndex:
                 # 密录组以干员名为名（「空」「林」「陈」……），不能参与出处标签的子串匹配
                 self.memory.setdefault(g.name, g.id)
                 continue
+            if g.category in gamedata.EXTRA_CATEGORIES:
+                continue  # 年表的出处只链到剧情回顾里的组
             self.by_name.setdefault(g.name, g.id)
         self.names = sorted(self.by_name, key=len, reverse=True)
 
@@ -179,7 +181,7 @@ class StoryIndex:
         else:
             code, title = "", base
         pools = [[e for g in group_ids for e in self.groups[g].episodes]] if group_ids else []
-        pools.append([e for g in self.groups.values() if g.category != gamedata.MEMORY for e in g.episodes])
+        pools.append([e for g in self.groups.values() if g.category in gamedata.CATEGORIES.values() for e in g.episodes])
         for pool in pools:
             for match in (lambda e: code and e.code == code, lambda e: title and e.title == title):
                 hits = [e for e in pool if match(e)]

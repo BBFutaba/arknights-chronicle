@@ -1,4 +1,5 @@
 """把一集剧本解析结果和实体登记表对上：谁出场、说了多少、提到了哪些地区势力。"""
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -25,6 +26,9 @@ class EpisodeData:
 def analyze_episode(ep: gamedata.Episode, reg: Registry) -> EpisodeData:
     sc = parse_script(gamedata.read_story(ep.txt))
     d = EpisodeData(ep, gamedata.read_info(ep.info), sc)
+    for line in sc.lines:  # dialog 指令的说话人是头像 id
+        if line.speaker and re.match(r"(char|npc)_", line.speaker):
+            line.speaker = gamedata.head_name(line.speaker)
     for line in sc.lines:
         if line.kind == "decision":
             d.lines[reg.doctor.name] += 1
