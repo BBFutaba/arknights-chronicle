@@ -84,7 +84,8 @@ input[type=search]:focus, select:focus { outline: 2px solid var(--accent-soft); 
 .sr-item.active, .sr-item:hover { background: var(--hover); color: var(--text); }
 .sr-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sr-sub { font-size: 12px; color: var(--muted); white-space: nowrap; }
-.about-btn { border: 1px solid var(--line); background: none; border-radius: 8px; padding: 5px 10px; cursor: pointer; color: var(--muted); }
+.credit { flex: none; margin-left: -10px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.about-btn { flex: none; border: 1px solid var(--line); background: none; border-radius: 8px; padding: 5px 10px; cursor: pointer; color: var(--muted); }
 dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); max-width: 560px; padding: 20px 24px; }
 dialog::backdrop { background: rgb(0 0 0 / 35%); }
 dialog h2 { margin-bottom: 12px; }
@@ -304,6 +305,9 @@ details[open] > summary { color: var(--text); }
 @media (max-width: 1100px) {
   .tl-detail { width: 300px; }
   .tl-side { display: none; }
+}
+@media (max-width: 900px) {
+  .credit { display: none; }
 }
 @media (max-width: 760px) {
   main { flex-direction: column; overflow: auto; }
