@@ -29,7 +29,8 @@
     python -m pipeline.annals zhuan <人物>            列出某人列传收录的条目，供写概述
     python -m pipeline.annals benmo <事名>            列出某件纪事本末的概述和所收条目
     python -m pipeline.annals long <稿件路径>         列出目超过三百字的组，删定用
-    python -m pipeline.annals quotes [输出文件]       核对纲目考异里的「」短引，列出剧本里找不到的
+    python -m pipeline.annals rawfind <正则>          在全部原始游戏文本里搜索（含没收进剧本库的）
+    python -m pipeline.annals quotes [输出文件]       核对纲目考异里的「」短引，列出全部游戏文本里都找不到的
 """
 from __future__ import annotations
 
@@ -40,6 +41,7 @@ from collections import Counter
 from functools import cache
 from pathlib import Path
 
+from . import config
 from .config import ROOT, SITE_DATA
 
 SRC_DIR = ROOT / "data" / "annals"
@@ -1062,8 +1064,43 @@ def long_groups(path: str, limit: int = 300):
     print(f"共 {n} 组超过 {limit} 字")
 
 
+def raw_texts():
+    """游戏数据里的全部文字，含没收进剧本库的：逐个产出 (来源, 行号, 一行文字)。"""
+    root = config.EXCEL.parent
+    for f in sorted((root / "story").rglob("*.txt")):
+        rel = f.relative_to(root / "story").with_suffix("").as_posix()
+        for i, line in enumerate(f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+            yield rel, i, line
+    for f in sorted(config.EXCEL.glob("*.json")):
+        def walk(v, path):
+            if isinstance(v, str):
+                if re.search(r"[一-鿿]", v):
+                    yield path, v
+            elif isinstance(v, dict):
+                for k, x in v.items():
+                    yield from walk(x, f"{path}/{k}")
+            elif isinstance(v, list):
+                for x in v:
+                    yield from walk(x, path)
+        for path, v in walk(json.loads(f.read_text(encoding="utf-8")), f.stem):
+            yield path, 0, v
+
+
+def rawfind(pattern: str, limit: int = 60):
+    """在全部原始文本里搜。find 只查剧本库，写「剧本不载」之前要用这个查一遍。"""
+    rx = re.compile(pattern)
+    n = 0
+    for src, i, line in raw_texts():
+        for m in rx.finditer(line):
+            n += 1
+            if n <= limit:
+                print(f"{src}:{i}  " + " ".join(line[max(0, m.start() - 60):m.end() + 60].splitlines()))
+            break
+    print(f"共 {n} 处" + (f"，只列前 {limit} 处" if n > limit else ""))
+
+
 def verify_quotes(out_path: str | None = None):
-    """核对【目】【纲】【考异】里的「」短引：在全部剧本、档案、简介、年表文字里找得到才算数。"""
+    """核对【目】【纲】【考异】里的「」短引：在全部剧本、档案、简介、年表、原始游戏文本里找得到才算数。"""
     norm = lambda t: re.sub(r"[\s，。、！？：；,.!?:;“”\"‘’'「」『』《》（）()—\-…·]", "", t.replace("{@Nickname}", "博士"))
     corpus = []
     for sid in episode_index():
@@ -1074,7 +1111,8 @@ def verify_quotes(out_path: str | None = None):
         corpus += [sec.get("text", "") for sec in prof.get("sections", [])]
         corpus.append(str(prof.get("basic", "")))
     for e in events().values():
-        corpus += e["lines"]
+        corpus += e["lines"] + (e.get("notes") or []) + [e.get("when") or ""] + [s["text"] for s in e["sources"]]
+    corpus += [line for _, _, line in raw_texts()]
     text = norm("\n".join(corpus))
     probs = Problems()
     bad, total = [], 0
@@ -1130,6 +1168,8 @@ def main(argv: list[str]) -> int:
         show(rest[0], *(int(x) for x in rest[1:3]))
     elif cmd == "find":
         find(rest[0], rest[1] if len(rest) > 1 else None)
+    elif cmd == "rawfind":
+        rawfind(rest[0])
     elif cmd == "check":
         return check(rest[0])
     elif cmd in ("build", "render"):
