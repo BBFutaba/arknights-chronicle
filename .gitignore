@@ -10,3 +10,5 @@ __pycache__/
 /annals/
 # 游戏原文的本地副本（TXT/EPUB/PDF，约 5GB，版权属于原作者）
 StoryText/
+# 公开版网页，由 python -m pipeline.publish 生成，部署到 gh-pages 分支
+/dist/

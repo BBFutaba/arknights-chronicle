@@ -40,9 +40,11 @@ function initAbout() {
   const dlg = document.getElementById('about');
   const m = D.meta;
   dlg.innerHTML = `<h2>关于</h2>
-    <p>剧本、干员档案和敌人图鉴来自 <a href="https://github.com/Kengxxiao/ArknightsGameData" target="_blank" rel="noopener">ArknightsGameData</a>（国服，版本 ${esc(m.data_version)}），版权归鹰角网络所有。</p>
+    <p>剧本、干员档案和敌人图鉴来自 <a href="https://github.com/Kengxxiao/ArknightsGameData" target="_blank" rel="noopener">ArknightsGameData</a>（国服，版本 ${esc(m.data_version)}），版权归鹰角网络所有。编年史的纲、目、考异是同人撰写。</p>
     <p>时间轴事件来自 <a href="https://prts.wiki/w/泰拉年表" target="_blank" rel="noopener">PRTS「泰拉年表」</a>（修订 ${esc(m.prts.revid)}，${esc(m.prts.timestamp.slice(0, 10))}），按 CC BY-NC-SA 4.0 协议使用。年表中的日期为社区根据剧情推测，可能有偏差。</p>
-    <p>共 ${m.stats.groups} 个剧情组、${m.stats.episodes} 集、${m.stats.events} 条事件、${m.stats.characters} 个人物。构建于 ${esc(m.built_at)}。仅供个人浏览，请勿公开发布。</p>
+    <p>共 ${m.stats.groups} 个剧情组、${m.stats.episodes} 集、${m.stats.events} 条事件、${m.stats.characters} 个人物。构建于 ${esc(m.built_at)}。${m.public
+      ? '这是同人整理的公开版，非官方作品，只收编年史和它引用的片段，不收剧本和干员档案全文。如有不妥，请在 GitHub 仓库提 issue。'
+      : '这是含剧本全文的本地版，仅供个人浏览，请勿公开发布。'}</p>
     <form method="dialog"><button>关闭</button></form>`;
   document.getElementById('about-btn').addEventListener('click', () => dlg.showModal());
 }

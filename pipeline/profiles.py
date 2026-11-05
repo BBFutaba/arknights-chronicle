@@ -2,6 +2,7 @@
 PRTS 干员页上的档案也是这两张表的内容，直接读本地数据即可。
 """
 import re
+from collections import Counter
 from functools import cache
 
 from . import gamedata
@@ -17,19 +18,33 @@ def _clean(s: str) -> str:
 def operator_profile(ch: Character) -> dict | None:
     """{"basic": {"性别": "女", ...}, "sections": [{"title": "客观履历", "text": ...}, ...]}"""
     handbook = gamedata.excel("handbook_info_table")["handbookDict"]
-    h = next((handbook[cid] for cid in ch.char_ids if cid in handbook), None)
-    if not h:
+    table = gamedata.excel("character_table")
+    books = [(cid, handbook[cid]) for cid in ch.char_ids if cid in handbook]
+    if not books:
         return None
-    basic, sections = {}, []
-    for s in h.get("storyTextAudio") or []:
-        text = _clean("\n".join(x.get("storyText", "") for x in s.get("stories") or []))
-        if not text:
-            continue
-        if s.get("storyTitle") == "基础档案":
-            parts = re.split(r"【([^】]+)】", text)
-            basic = {k.strip(): v.strip() for k, v in zip(parts[1::2], parts[2::2])}
-        else:
-            sections.append({"title": s.get("storyTitle", ""), "text": text})
+    basic, sections, seen, titles = {}, [], set(), Counter()
+    for cid, h in books:
+        # 异格、合并进来的另一身份（W 和维什戴尔）各有档案，栏目名前加名字
+        other = table[cid]["name"] if table[cid]["name"] != ch.name and cid != books[0][0] else ""
+        for s in h.get("storyTextAudio") or []:
+            text = _clean("\n".join(x.get("storyText", "") for x in s.get("stories") or []))
+            if not text:
+                continue
+            title = s.get("storyTitle", "")
+            if title == "基础档案":
+                if not basic:
+                    parts = re.split(r"【([^】]+)】", text)
+                    basic = {k.strip(): v.strip() for k, v in zip(parts[1::2], parts[2::2])}
+                continue
+            # 阿米娅这样有多种形态的干员，同一栏会重复出现，文字只差空白
+            key = re.sub(r"\s", "", text)
+            if key in seen:
+                continue
+            seen.add(key)
+            title = f"{other}·{title}" if other else title
+            titles[title] += 1  # 同名不同文的（升变前后的临床诊断）标序号
+            n = titles[title]
+            sections.append({"title": title if n == 1 else f"{title}（{n}）", "text": text})
     return {"basic": basic, "sections": sections}
 
 

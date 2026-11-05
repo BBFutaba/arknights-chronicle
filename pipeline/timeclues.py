@@ -9,6 +9,7 @@
     python -m pipeline.timeclues show <组id>        列出一个剧情组每集的时间线索
     python -m pipeline.timeclues gaps <年份>        列出系于这一年的剧情组里，年表和编年史都没碰到的分集
     python -m pipeline.timeclues years              各剧情组：原文明写的年份 与 PRTS 系年 对照
+    python -m pipeline.timeclues year <年份>        全部剧本里明写了这一年的地方
 
 时间线索只是素材：哪一集发生在哪一天，要结合上下文判断，写进 data/annals/丛目/<年份>.md。
 """
@@ -74,6 +75,7 @@ def prts_index() -> tuple[dict, dict, dict]:
     own: dict[str, Counter] = defaultdict(Counter)
     refs: dict[str, Counter] = defaultdict(Counter)
     by_ep: dict[str, list[str]] = defaultdict(list)
+    by_name = {g["name"]: gid for gid, g in A.groups().items()}
     for eid, e in A.events().items():
         y = e["year"]
         if y and e["thread"] in A.groups():
@@ -82,6 +84,13 @@ def prts_index() -> tuple[dict, dict, dict]:
             for g in s["groups"]:
                 if y:
                     refs[g][y] += 1
+            # 活动故事常常只写组名、不注分集，thread 也只记作 lore：按出处文字认组
+            title = re.split(r"[：:]", s.get("text") or "")[0].strip()
+            if y and not s["groups"] and title in by_name:
+                gid = by_name[title]
+                refs[gid][y] += 1
+                if e["thread"] == "lore":
+                    own[gid][y] += 1
             for sid in s["stories"]:
                 by_ep[sid].append(eid)
     return own, refs, by_ep
@@ -171,6 +180,16 @@ def gaps(year: int):
     print(f"\n共 {total} 集未覆盖。")
 
 
+def year(y: int):
+    """全部剧本里明写了这一年的场景抬头和对白，查回忆、补条用。"""
+    needle = f"{y}年"
+    for gid, g in load().items():
+        for ep in g["episodes"]:
+            for c in ep["clues"]:
+                if needle in re.sub(r"\s", "", c["text"]):
+                    print(f"{ep['id']}:{c['line']}  {g['name']}  {c['text'][:70]}")
+
+
 def main(argv: list[str]) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -183,6 +202,8 @@ def main(argv: list[str]) -> int:
         gaps(int(rest[0]))
     elif cmd == "years":
         years()
+    elif cmd == "year":
+        year(int(rest[0]))
     else:
         print(__doc__)
     return 0

@@ -2,7 +2,7 @@
 // 路由：#/annals/1097（一卷）、#/annals/1097?e=ev0536（跳到某条）、#/annals/1097?s=正月（跳到某月）、
 //      #/annals/本末/<事名>（纪事本末）、#/annals/传/<人物>（列传）、#/annals/凡例
 import { D } from './data.js';
-import { esc, href, charChip } from './util.js';
+import { esc, href, charChip, charOf } from './util.js';
 
 let side, content, shown = null;
 
@@ -28,7 +28,8 @@ export function update(r) {
   else if (a === '传' && D.zhuanByName[b]) renderZhuan(D.zhuanByName[b]);
   else if (a === '凡例') renderFanli();
   else {
-    vol = D.annals.volumes.find((v) => String(v.year) === a) ?? D.annals.volumes[0];
+    vol = D.annals.volumes.find((v) => String(v.year) === a)
+      ?? D.annals.volumes.find((v) => v.year === 1096) ?? D.annals.volumes[0];
     renderVolume(vol);
   }
   renderSide(vol, a === '本末' ? b : a === '传' ? `传:${b}` : a === '凡例' ? '凡例' : null);
@@ -42,15 +43,18 @@ export function unmount() {
 // ---------------------------------------------------------------- 左栏
 
 function renderSide(vol, activeOther) {
-  const vols = D.annals.volumes.map((v) => {
+  // 前纪、外纪在主线之前：分两段显示
+  const group = (v) => (v.year === '不系年' ? '不系年' : typeof v.year === 'number' && v.year >= 1096 ? '主线' : '前纪与外纪');
+  const vols = D.annals.volumes.map((v, i, all) => {
+    const head = i === 0 || group(all[i - 1]) !== group(v) ? `<div class="an-vol-group muted">${group(v)}</div>` : '';
     const active = vol && v.year === vol.year;
     const toc = active ? v.sections.map((s) => `
       <a class="list-item an-toc" href="#/annals/${v.year}?s=${encodeURIComponent(s.label)}">
         <span class="grow">${esc(s.label)}</span><span class="n">${countGang(s)}</span></a>`).join('')
       + (v.cunmu?.length ? `<a class="list-item an-toc" href="#/annals/${v.year}?s=存目">
         <span class="grow muted">存目</span><span class="n">${v.cunmu.length}</span></a>` : '') : '';
-    return `<a class="list-item${active ? ' active' : ''}" href="${href.annals(v.year)}">
-        <span class="grow">${esc(v.title.replace('结晶纪元', ''))}</span><span class="n">${v.stats.gang} 纲</span></a>${toc}`;
+    return `${head}<a class="list-item${active ? ' active' : ''}" href="${href.annals(v.year)}">
+        <span class="grow">${esc(v.title.replace(/^结晶纪元/, ''))}</span><span class="n">${v.stats.gang} 纲</span></a>${toc}`;
   }).join('');
   const benmo = D.annals.benmo.map((b) => `
     <a class="list-item${activeOther === b.title ? ' active' : ''}" href="${href.benmo(b.title)}">
@@ -78,7 +82,7 @@ function renderVolume(v) {
   const prev = D.annals.volumes[i - 1], next = D.annals.volumes[i + 1];
   const st = v.stats;
   content.innerHTML = `<div class="an-body">
-    <div class="sub">泰拉编年史</div>
+    <div class="sub">明日方舟编年史</div>
     <h1>${esc(v.title)}</h1>
     <div class="sub">${st.entries} 条年表事件 · ${st.gang} 组纲目 · ${st.quotes} 段原文 · 撰文 ${st.prose.toLocaleString()} 字，引文 ${st.quote_chars.toLocaleString()} 字 · <a href="#/annals/凡例">凡例</a></div>
     ${controls()}
@@ -144,7 +148,7 @@ function renderFanli() {
   if (shown === 'fanli') return;
   shown = 'fanli';
   content.innerHTML = `<div class="an-body">
-    <div class="sub">泰拉编年史</div>
+    <div class="sub">明日方舟编年史</div>
     <h1>凡例</h1>
     <ul class="an-fanli">${D.annals.fanli.map((l) => `<li>${inline(l)}</li>`).join('')}</ul>
     <h4>各卷</h4>
@@ -224,7 +228,7 @@ function entryHtml(e, withWhen = false) {
 function inline(s) {
   return esc(s)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, name, label) => (D.chars[name]
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, name, label) => (charOf(name)
       ? `<a class="an-p" href="${href.char(name)}">${label ?? name}</a>` : (label ?? name)));
 }
 

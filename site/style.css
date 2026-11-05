@@ -312,3 +312,4 @@ details[open] > summary { color: var(--text); }
   .search { display: none; }
   .cols { grid-template-columns: 1fr; }
 }
+.an-vol-group { padding: 6px 12px 2px; font-size: 12px; }

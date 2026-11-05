@@ -27,6 +27,9 @@
     python -m pipeline.annals check <稿件路径>        检查一个稿件文件
     python -m pipeline.annals build                   检查并导出全部卷和纪事本末
     python -m pipeline.annals zhuan <人物>            列出某人列传收录的条目，供写概述
+    python -m pipeline.annals benmo <事名>            列出某件纪事本末的概述和所收条目
+    python -m pipeline.annals long <稿件路径>         列出目超过三百字的组，删定用
+    python -m pipeline.annals quotes [输出文件]       核对纲目考异里的「」短引，列出剧本里找不到的
 """
 from __future__ import annotations
 
@@ -47,6 +50,22 @@ MAX_CHARS = 450
 
 
 # ---------------------------------------------------------------- 游戏数据
+
+
+@cache
+def aliases() -> dict[str, str]:
+    """别名.md：同一个人的另一个名字，每行「别名=正名」。正名是列传和人物页用的名字。"""
+    path = SRC_DIR / "别名.md"
+    out: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines() if path.exists() else []:
+        if "=" in raw and not raw.startswith(("#", "<!--")):
+            a, _, c = raw.partition("=")
+            out[a.strip()] = c.strip()
+    return out
+
+
+def canon(name: str) -> str:
+    return aliases().get(name, name)
 
 
 @cache
@@ -89,8 +108,28 @@ def events() -> dict[str, dict]:
     return {e["id"]: e for e in data["events"]}
 
 
-def year_events(year: int) -> list[str]:
-    return [i for i, e in events().items() if e["year"] == year or str(year) in e["era"]]
+def eff_year(e: dict) -> int | None:
+    """PRTS 把「11 世纪 30 年代」记作 year=30，还原成 1030。"""
+    y = e.get("year")
+    if y is not None and 0 <= y < 100 and "11世纪" in e["era"]:
+        return 1000 + y
+    return y
+
+
+# 前纪、外纪的事件散在一百多个年份，不能一年一卷：合成一卷（目录名即卷名），卷内按年表先后排，以年为大标题。
+MERGED = {
+    "外纪": ("外纪 · 结晶纪元之前", lambda e: e["era"] in ("结晶纪元之前", "可确认的大致时间点")),
+    "前纪甲": ("前纪 · 十一世纪前", lambda e: "11 世纪前" in e["era"]),
+    "前纪乙": ("前纪 · 一〇〇〇至一〇五九年", lambda e: "00 年代" in e["era"] and (eff_year(e) or 0) < 1060),
+    "前纪丙": ("前纪 · 一〇六〇至一〇七九年", lambda e: "00 年代" in e["era"] and (eff_year(e) or 0) >= 1060),
+    "不系年": ("不系年 · 原文与年表都无年份的剧情", lambda e: False),
+}
+
+
+def year_events(year) -> list[str]:
+    if year in MERGED:
+        return [i for i, e in events().items() if MERGED[year][1](e)]
+    return [i for i, e in events().items() if eff_year(e) == year or (year == 1103 and "时间未知" in e["era"])]
 
 
 def line_text(line: list) -> str:
@@ -217,6 +256,36 @@ def cn_year(y: int) -> str:
     return "".join(CN[int(c)] for c in str(y))
 
 
+def cn_big(n: int) -> str:
+    """一万、九千、四百、三十五……（前几千年的年份）。"""
+    for unit, name in ((10000, "万"), (1000, "千"), (100, "百")):
+        if n >= unit:
+            head, rest = divmod(n, unit)
+            return cn_num(head) + name + (cn_big(rest) if rest else "")
+    return cn_num(n)
+
+
+def era_label(when: str, y: int | None, vol: str) -> str:
+    """合卷里的年份大标题。"""
+    w = when.strip()
+    if m := re.match(r"^(约?)前\s*(\d+)\s*年(?:\s*[~～\-]\s*前\s*(\d+)\s*年)?", w):
+        tail = f"至前{cn_big(int(m[3]))}年" if m[3] else "年"
+        return f"{m[1]}前{cn_big(int(m[2]))}{tail}"
+    if m := re.match(r"^(\d+)\s*年?\s*[~～\-]\s*(\d+)\s*年", w):
+        return f"{cn_year(int(m[1]))}至{cn_year(int(m[2]))}年"
+    if m := re.match(r"^(\d+)\s*年前后", w):
+        return f"{cn_year(int(m[1]))}年前后"
+    if m := re.match(r"^(\d+)\s*世纪\s*(\d+)\s*年代", w):
+        return f"{cn_year((int(m[1]) - 1) * 100 + int(m[2]))}年代"
+    if m := re.match(r"^(\d+)\s*世纪", w):
+        return f"{cn_num(int(m[1]))}世纪"
+    if y is None:
+        return w
+    if vol == "外纪" and y > 0:
+        return f"泰拉历{cn_big(y)}年"
+    return f"{cn_year(y)}年"
+
+
 def cn_month(m: int) -> str:
     return "正月" if m == 1 else f"{cn_num(m)}月"
 
@@ -226,7 +295,7 @@ def placement(when: str) -> tuple[str, str | None]:
     rest = re.sub(r"^\s*\d+\s*年", "", when).strip()
     if not rest or "未知" in rest:
         return "是岁", None
-    if m := re.fullmatch(r"(\d+)\s*[~～\-]\s*(\d+)\s*月", rest):
+    if m := re.fullmatch(r"(\d+)\s*月?\s*[~～\-]\s*(\d+)\s*月", rest):
         return f"{cn_month(int(m[1]))}至{cn_month(int(m[2]))}", None
     if m := re.fullmatch(r"(\d+)\s*月\s*(\d+)\s*日.*", rest):
         return cn_month(int(m[1])), f"{cn_num(int(m[2]))}日"
@@ -234,6 +303,8 @@ def placement(when: str) -> tuple[str, str | None]:
         return cn_month(int(m[1])), "是月"
     if m := re.fullmatch(r"(春|夏|秋|冬)季?", rest):
         return m[1], None
+    if m := re.fullmatch(r"\d+\s*世纪\s*(\d+)\s*年代", rest):
+        return f"{cn_num(int(m[1]) // 10)}十年代", None
     return rest, None
 
 
@@ -248,7 +319,7 @@ SEASON_AFTER = {"春": 3, "夏": 7, "秋": 8, "冬": 11}
 def date_key(when: str) -> tuple[int, int, int]:
     """系日 → 排序键 (月, 类, 日)：同一个月里「是月」和跨月的在前，具体日子居中，季节在后。"""
     rest = re.sub(r"^\s*\d+\s*年", "", when).strip()
-    if m := re.fullmatch(r"(\d+)\s*[~～\-]\s*(\d+)\s*月", rest):
+    if m := re.fullmatch(r"(\d+)\s*月?\s*[~～\-]\s*(\d+)\s*月", rest):
         return int(m[1]), 0, 0
     if m := re.fullmatch(r"(\d+)\s*月\s*(\d+)\s*日.*", rest):
         return int(m[1]), 1, int(m[2])
@@ -256,15 +327,19 @@ def date_key(when: str) -> tuple[int, int, int]:
         return int(m[1]), 0, 0
     if m := re.fullmatch(r"(春|夏|秋|冬)季?", rest):
         return SEASON_AFTER[m[1]], 2, 0
+    if rest.startswith(("年初", "新春")):
+        return 0, 0, 0
     return 13, 0, 0
 
 
 def parse_override(value: str) -> tuple[int, str] | None:
     """系:1097-11-01 / 1097-01 / 1097-秋 / 1097-02~04 → (年, PRTS 式的时间写法)。"""
-    m = re.fullmatch(r"(\d{3,4})-(?:(春|夏|秋|冬)|(\d{1,2})~(\d{1,2})|(\d{1,2})(?:-(\d{1,2}))?)", value)
+    m = re.fullmatch(r"(\d{3,4})(?:-(?:(春|夏|秋|冬)|(\d{1,2})~(\d{1,2})|(\d{1,2})(?:-(\d{1,2}))?))?", value)
     if not m:
         return None
     y = int(m[1])
+    if not (m[2] or m[3] or m[5]):
+        return y, f"{y} 年"  # 只知年份：补条配合「是岁:地区」用
     if m[2]:
         return y, f"{y} 年 {m[2]}季"
     if m[3]:
@@ -285,9 +360,12 @@ class Entry:
         self.shi: list[str] = []                   # 事:…（归属的纪事本末）
         self.zhuan: list[str] = []                 # 传:…（归属的列传）
         self.after: str | None = None              # 次:evXXXX（补条排在同日的这条之后）
+        self.tail = False                          # 月末：只知月份，但在当月各日之后
+        self.early = False                         # 季初：只知季节，但在这一季各月之前
         self.lines: list[tuple[str, str]] = []
         self.groups: list[dict] = []
-        self.year = 0
+        self.year: int | None = 0
+        self.merged: str | None = None             # 合卷（外纪、前纪甲……）的卷名
         self.section: str | None = None
         self.day: str | None = None
 
@@ -303,7 +381,7 @@ class Entry:
     @property
     def order(self) -> int:
         """同日之内的先后：PRTS 事件按年表编号，补条排在同日的年表事件之后。"""
-        if self.sup:
+        if self.sup or (self.merged and self.after):  # 合卷里，改系的年表条目也靠 次: 排位
             return num(self.after) * 2 + 1 if self.after else 10**7
         return num(self.anchor) * 2
 
@@ -321,6 +399,8 @@ class Entry:
         """改了 PRTS 的系日：用了 系:，或把有月日的事件放进了是岁。补条本来就没有年表日期，不算。"""
         if self.sup:
             return False
+        if self.merged or "世纪" in self.prts_when:
+            return bool(self.moved)
         return bool(self.moved) or (bool(self.region) and placement(self.prts_when)[0] != "是岁")
 
     @property
@@ -336,10 +416,36 @@ class Entry:
         else:
             self.section, self.day = "？", None
 
+    def place_merged(self):
+        """合卷：年份作大标题，月日或地区作小标题。"""
+        when = self.system_when or ""
+        label = era_label(when, self.year, self.merged)
+        if self.region:
+            self.section, self.day = label, self.region
+            return
+        rest = re.sub(r"^\s*\d+\s*年", "", when).strip()
+        if rest != when.strip() and rest and "年" not in rest and "未知" not in rest:
+            sec, day = placement(when)
+            self.section, self.day = label, sec + (day if day and day != "是月" else "")
+        else:
+            self.section, self.day = label, None
+
+    @property
+    def vol(self):
+        """这条所在的卷：网页链接用。"""
+        return self.merged or self.year
+
     def sort_key(self) -> tuple:
-        return date_key(self.system_when), self.order
+        key = date_key(self.system_when)
+        if self.tail:
+            key = (key[0], 1, 99)
+        elif self.early:
+            key = (key[0] - 1, 9, 0)
+        return key, self.order
 
     def when(self, short: bool = False) -> str:
+        if self.merged:
+            return self.section if short else self.section + (self.day or "")
         y = f"{cn_year(self.year)}年"
         if self.section == "是岁":
             return y if short else f"{y}（月日不详）"
@@ -349,7 +455,7 @@ class Entry:
 
     def people(self) -> set[str]:
         """【人物】里链接的名字。"""
-        return {n for g in self.groups for t in g["people"] for n in re.findall(r"\[\[([^\]|]+)", t)}
+        return {canon(n) for g in self.groups for t in g["people"] for n in re.findall(r"\[\[([^\]|]+)", t)}
 
 
 def parse_entries(path: Path, probs: Problems) -> list[Entry]:
@@ -375,9 +481,15 @@ def parse_entries(path: Path, probs: Problems) -> list[Entry]:
                 elif key == "事" and val:
                     e.shi += [v for v in val.split(",") if v]
                 elif key == "传" and val:
-                    e.zhuan += [v for v in val.split(",") if v]
+                    e.zhuan += [canon(v) for v in val.split(",") if v]
                 elif key == "次" and re.fullmatch(r"ev\d+", val):
                     e.after = val
+                elif tok == "不系年":
+                    e.moved = (None, "不系年")
+                elif tok == "月末":
+                    e.tail = True
+                elif tok == "季初":
+                    e.early = True
                 elif tok == "附":
                     e.minor = True
                 elif tok == "存目":
@@ -387,6 +499,8 @@ def parse_entries(path: Path, probs: Problems) -> list[Entry]:
             if e.sup:
                 if not e.moved:
                     probs.add(where, f"{ids[0]} 是补条，要写系日：系:年-月-日")
+                elif placement(e.moved[1])[0] == "是岁" and not e.region:
+                    probs.add(where, f"{ids[0]} 只知年份，要同时写 是岁:地区")
                 continue
             unknown = [i for i in e.ids if i not in events()]
             for i in unknown:
@@ -477,8 +591,15 @@ def shufa_hits(e: Entry) -> list[str]:
     return SHUFA_RE.findall(re.sub(r"「[^」]*」", "", text))
 
 
-def volume_years() -> list[int]:
-    return sorted(int(p.name) for p in SRC_DIR.iterdir() if p.is_dir() and p.name.isdigit())
+def volume_years() -> list:
+    """全部卷，按年代先后：合卷在前，然后一年一卷。"""
+    merged = [k for k in MERGED if (SRC_DIR / k).is_dir() and k != "不系年"]
+    tail = ["不系年"] if (SRC_DIR / "不系年").is_dir() else []
+    return merged + sorted(int(p.name) for p in SRC_DIR.iterdir() if p.is_dir() and p.name.isdigit()) + tail
+
+
+def volume_title(year) -> str:
+    return MERGED[year][0] if year in MERGED else f"结晶纪元{cn_year(year)}年"
 
 
 def load_volume(year: int, probs: Problems) -> list[Entry]:
@@ -487,6 +608,16 @@ def load_volume(year: int, probs: Problems) -> list[Entry]:
     for part in sorted((SRC_DIR / str(year)).glob("*.md")):
         entries += parse_entries(part, probs)
     for e in entries:
+        if year in MERGED:
+            e.merged = year
+            first = next((events()[i] for i in e.ids if i in events()), None)
+            e.year = e.moved[0] if e.moved else (eff_year(first) if first else None)
+            e.place_merged()
+            if e.sup and not e.after and year != "不系年":
+                probs.add(e.where, f"{e.ids[0]} 在合卷里要写 次:ev编号，才排得进年表")
+            if not e.moved and any(i in events() and not MERGED[year][1](events()[i]) for i in e.ids):
+                probs.add(e.where, f"{','.join(e.ids)} 不属于「{year}」卷")
+            continue
         e.year = year
         if e.moved:
             if e.moved[0] != year:
@@ -500,6 +631,8 @@ def load_volume(year: int, probs: Problems) -> list[Entry]:
 
 def order_entries(entries: list[Entry]) -> list[Entry]:
     """有日期的按系日排，同日按年表先后；只知年份的放到卷末，按地区分组，地区按首次出现排。"""
+    if entries and entries[0].merged:
+        return sorted(entries, key=lambda e: e.order)
     dated = sorted((e for e in entries if not e.region), key=Entry.sort_key)
     yearly = sorted((e for e in entries if e.region), key=lambda e: e.order)
     regions = list(dict.fromkeys(e.region for e in yearly))
@@ -563,7 +696,9 @@ def by_thread(b: dict, e: Entry) -> bool:
 
 def chrono(e: Entry) -> tuple:
     """跨卷排序：逐年排列，只知年份的放在当年末尾。"""
-    return e.year, bool(e.region), date_key(e.system_when), e.order
+    if e.merged:
+        return (9999 if e.merged == "不系年" else list(MERGED).index(e.merged)), 0, e.order
+    return 100 + e.year, bool(e.region), e.sort_key()
 
 
 def benmo_members(b: dict, entries: list[Entry]) -> list[Entry]:
@@ -573,7 +708,7 @@ def benmo_members(b: dict, entries: list[Entry]) -> list[Entry]:
             return False
         if e.shi:
             return b["title"] in e.shi
-        return e.main and by_thread(b, e)
+        return e.main and not e.merged and by_thread(b, e)  # 合卷的远事不自动归入，要写明 事:
 
     return sorted((e for e in entries if hit(e)), key=chrono)
 
@@ -610,11 +745,13 @@ def add_intros(entries: list[Entry], renwu: dict[str, str]) -> list[str]:
                 continue
             for t in g["people"]:
                 for n in re.findall(r"\[\[([^\]|]+)", t):
-                    if n in seen:
+                    c = canon(n)
+                    if c in seen:
                         continue
-                    seen.add(n)
-                    if n in renwu:
-                        g["intro"].append({"name": n, "text": renwu[n]})
+                    seen.add(c)
+                    others = [a for a, x in aliases().items() if x == c]
+                    if text := next((renwu[m] for m in [n, c, *others] if m in renwu), None):
+                        g["intro"].append({"name": n, "text": text})
                     else:
                         missing.append(n)
     return missing
@@ -646,7 +783,7 @@ def load_liezhuan(probs: Problems) -> list[dict]:
 
 def entry_json(e: Entry, benmo_titles: list[str]) -> dict:
     return {
-        "id": e.anchor, "ids": e.ids, "year": e.year, "when": e.when(),
+        "id": e.anchor, "ids": e.ids, "year": e.vol, "when": e.when(),
         "threads": sorted({events()[i]["thread"] for i in e.ids if i in events()}),
         "benmo": benmo_titles, "zhuan": e.zhuan, "groups": e.groups, "minor": e.minor, "sup": e.sup,
         "moved": e.prts_when if e.is_moved else None,
@@ -731,9 +868,9 @@ def build(quiet: bool = False) -> int:
         for e in es:
             belongs.setdefault(id(e), []).append(title)
 
-    data = {"fanli": fanli_lines(), "volumes": [], "benmo": [], "liezhuan": []}
+    data = {"fanli": fanli_lines(), "aliases": aliases(), "volumes": [], "benmo": [], "liezhuan": []}
     # 归属：立条必须是某件事的一环或某个人的一笔；只靠故事线自动归入的，算「未确认」
-    orphans = [e for e in all_entries if e.main and not e.zhuan and id(e) not in belongs]
+    orphans = [e for e in all_entries if e.main and not e.zhuan and id(e) not in belongs and e.merged != "不系年"]
     implicit = [e for e in all_entries if e.main and not e.shi and not e.zhuan and id(e) in belongs]
     OUT_DIR.mkdir(exist_ok=True)
     for year, all_in_year in volumes:
@@ -747,7 +884,7 @@ def build(quiet: bool = False) -> int:
                                 + "".join(k["text"] for k in g["kaoyi"]))) for e in entries for g in e.groups)
         n_gang = sum(len(e.groups) for e in entries)
         data["volumes"].append({
-            "year": year, "title": f"结晶纪元{cn_year(year)}年",
+            "year": year, "title": volume_title(year),
             "stats": {"entries": len(entries), "gang": n_gang, "quotes": n_quotes, "prose": prose, "quote_chars": q_chars},
             "sections": [{"label": s["label"], "days": [
                 {"label": d["label"], "entries": [entry_json(e, belongs.get(id(e), [])) for e in d["entries"]]}
@@ -755,7 +892,7 @@ def build(quiet: bool = False) -> int:
             "cunmu": [{"id": e.anchor, "ids": e.ids, "prts": e.prts_when, "gang": e.groups[0]["gang"] if e.groups else "",
                        "kaoyi": [k for g in e.groups for k in g["kaoyi"]]} for e in cunmu],
         })
-        md = [f"# 泰拉编年史 · 结晶纪元{cn_year(year)}年", ""]
+        md = [f"# 明日方舟编年史 · {volume_title(year)}", ""]
         for s in secs:
             md += [f"## {s['label']}", ""]
             for d in s["days"]:
@@ -784,7 +921,7 @@ def build(quiet: bool = False) -> int:
             continue
         data["benmo"].append({
             "title": b["title"], "summary": b["summary"], "span": [es[0].when(True), es[-1].when(True)],
-            "entries": [{"year": e.year, "id": e.anchor} for e in es],
+            "entries": [{"year": e.vol, "id": e.anchor} for e in es],
         })
         if not quiet:
             print(f"纪事本末「{b['title']}」：{len(es)} 条，{es[0].when(True)} 至 {es[-1].when(True)}")
@@ -795,8 +932,8 @@ def build(quiet: bool = False) -> int:
         data["liezhuan"].append({
             "name": z["name"], "summary": z["summary"],
             "span": [es[0].when(True), es[-1].when(True)] if es else None,
-            "entries": [{"year": e.year, "id": e.anchor} for e in es],
-            "others": [{"year": e.year, "id": e.anchor} for e in others],
+            "entries": [{"year": e.vol, "id": e.anchor} for e in es],
+            "others": [{"year": e.vol, "id": e.anchor} for e in others],
         })
         if not quiet:
             print(f"列传「{z['name']}」：{len(es)} 条，其他出场 {len(others)} 条")
@@ -892,7 +1029,8 @@ def zhuan(name: str):
         print(f"列传里没有「{name}」")
         return
     renwu = load_renwu(Problems())
-    print(f"# {name}传　人物志：{renwu.get(name, '（无）')}")
+    others = [a for a, c in aliases().items() if c == name]
+    print(f"# {name}传　人物志：{next((renwu[n] for n in [name, *others] if n in renwu), '（无）')}")
     if z["summary"]:
         print("现有概述：" + "".join(z["summary"]))
     for r in z["entries"]:
@@ -909,6 +1047,76 @@ def zhuan(name: str):
         for r in z["others"]:
             e = idx[r["id"]]
             print(f"  {e['when']}  " + e["groups"][0]["gang"].replace("**", ""))
+
+
+def long_groups(path: str, limit: int = 300):
+    """删定用：列出一个稿件里目超过 limit 字的组。"""
+    probs = Problems()
+    n = 0
+    for e in parse_entries(Path(path).resolve(), probs):
+        for g in e.groups:
+            size = len(re.sub(r"\s|\*|\[\[|\]\]", "", "".join(g["mu"])))
+            if size > limit:
+                n += 1
+                print(f"{e.anchor}  目 {size} 字  {g['gang'].replace('**', '')[:40]}")
+    print(f"共 {n} 组超过 {limit} 字")
+
+
+def verify_quotes(out_path: str | None = None):
+    """核对【目】【纲】【考异】里的「」短引：在全部剧本、档案、简介、年表文字里找得到才算数。"""
+    norm = lambda t: re.sub(r"[\s，。、！？：；,.!?:;“”\"‘’'「」『』《》（）()—\-…·]", "", t.replace("{@Nickname}", "博士"))
+    corpus = []
+    for sid in episode_index():
+        corpus += [(ln[1] or "") + " " + line_text(ln) for ln in lines_of(sid) if ln[0] != "b"]
+        corpus.append(episode_index()[sid][1].get("synopsis", ""))
+    for c in characters().values():
+        prof = c.get("profile") or {}
+        corpus += [sec.get("text", "") for sec in prof.get("sections", [])]
+        corpus.append(str(prof.get("basic", "")))
+    for e in events().values():
+        corpus += e["lines"]
+    text = norm("\n".join(corpus))
+    probs = Problems()
+    bad, total = [], 0
+    for y in volume_years():
+        for e in load_volume(y, probs):
+            for g in e.groups:
+                fields = [("纲", g["gang"])] + [("目", t) for t in g["mu"]] + [("考异", k["text"]) for k in g["kaoyi"]]
+                for name, t in fields:
+                    for q in re.findall(r"「([^「」]{4,})」", t):
+                        pieces = [norm(x) for x in re.split(r"……|…", q)]
+                        pieces = [x for x in pieces if len(x) >= 3]
+                        if not pieces:
+                            continue
+                        total += 1
+                        if not all(x in text for x in pieces):
+                            bad.append((y, e.where, e.anchor, name, q))
+    lines = [f"{y}\t{w}\t{a}\t{n}\t{q}" for y, w, a, n, q in bad]
+    print(f"短引 {total} 处，找不到 {len(bad)} 处")
+    if out_path:
+        Path(out_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    else:
+        print("\n".join(lines))
+
+
+def show_benmo(title: str):
+    """列出一件纪事本末的概述和所收条目（纲、目），供核对概述用。"""
+    data = json.loads((SITE_DATA / "annals.json").read_text(encoding="utf-8"))
+    idx = {e["id"]: e for v in data["volumes"] for s in v["sections"] for d in s["days"] for e in d["entries"]}
+    b = next((x for x in data["benmo"] if x["title"] == title), None)
+    if not b:
+        print(f"纪事本末里没有「{title}」")
+        return
+    print(f"# {title}")
+    print("现有概述：" + "".join(b["summary"]))
+    for r in b["entries"]:
+        e = idx[r["id"]]
+        print()
+        print(f"## {e['when']}{'〔附〕' if e['minor'] else ''}  {e['id']}")
+        for g in e["groups"]:
+            print("纲：" + g["gang"].replace("**", ""))
+            for m in g["mu"]:
+                print("目：" + m)
 
 
 def main(argv: list[str]) -> int:
@@ -928,6 +1136,12 @@ def main(argv: list[str]) -> int:
         return build()
     elif cmd == "zhuan":
         zhuan(rest[0])
+    elif cmd == "benmo":
+        show_benmo(rest[0])
+    elif cmd == "long":
+        long_groups(rest[0])
+    elif cmd == "quotes":
+        verify_quotes(rest[0] if rest else None)
     else:
         print(__doc__)
         return 2

@@ -41,7 +41,8 @@ export function mount(el, r) {
 }
 
 export function update(r) {
-  const name = r.parts[0] && D.chars[r.parts[0]] ? r.parts[0] : '阿米娅';
+  const asked = r.parts[0] && (D.chars[r.parts[0]] ? r.parts[0] : D.charAlias[r.parts[0]]);
+  const name = asked || '阿米娅';
   renderList(name);
   renderProfile(name);
   content.scrollTop = 0;

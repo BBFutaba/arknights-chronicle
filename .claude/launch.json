@@ -4,8 +4,26 @@
     {
       "name": "story-browser",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "pipeline.serve", "--no-browser", "--port", "8765"],
+      "runtimeArgs": [
+        "-m",
+        "pipeline.serve",
+        "--no-browser",
+        "--port",
+        "8765"
+      ],
       "port": 8765
+    },
+    {
+      "name": "public-edition",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--directory",
+        "dist"
+      ],
+      "port": 8766
     }
   ]
 }

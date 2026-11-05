@@ -33,8 +33,18 @@ export async function loadAll() {
       people.forEach((n) => (D.annalsByPerson[n] ??= []).push(e.id));
     }
   }
+  // 一人多名：剧本和编年史里写哪个名字，都指向同一个人物页
+  D.charAlias = {};
+  for (const [name, c] of Object.entries(D.chars)) for (const a of c.aliases) D.charAlias[a] ??= name;
+  for (const [a, name] of Object.entries(D.annals?.aliases ?? {})) if (D.chars[name]) D.charAlias[a] ??= name;
   for (const b of D.annals?.benmo ?? []) D.benmoByTitle[b.title] = b;
   for (const z of D.annals?.liezhuan ?? []) D.zhuanByName[z.name] = z;
+  // 一人多名：别名和正名共用列传和编年史出场
+  for (const [alias, name] of Object.entries(D.annals?.aliases ?? {})) {
+    if (D.zhuanByName[name]) D.zhuanByName[alias] = D.zhuanByName[name];
+    const both = [...new Set([...(D.annalsByPerson[name] ?? []), ...(D.annalsByPerson[alias] ?? [])])];
+    if (both.length) D.annalsByPerson[name] = D.annalsByPerson[alias] = both;
+  }
 }
 
 const storyCache = {};

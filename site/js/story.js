@@ -1,6 +1,6 @@
 // 剧情：左侧剧情组目录，右侧是剧情组概览或分集阅读。
 import { D, loadStory } from './data.js';
-import { esc, href, epLabel, groupLabel, charChip, powerChip, eventItem, threadColor } from './util.js';
+import { esc, href, epLabel, groupLabel, charChip, charOf, powerChip, eventItem, threadColor } from './util.js';
 
 let root, side, content, cat = '主线', filter = '', renderToken = 0;
 
@@ -105,9 +105,13 @@ async function renderEpisode(sid, hl = new Set()) {
     <div class="script muted">正在加载剧本…</div>
     ${nav}`;
   const token = ++renderToken;
-  const story = await loadStory(g.id);
+  const story = await loadStory(g.id).catch(() => null);
   const box = content.querySelector('.script');
   if (token !== renderToken || !box) return;  // 加载期间已跳到别的页面
+  if (!story) {
+    box.textContent = '公开版不收录剧本全文（版权归鹰角网络），请到游戏内阅读。编年史里引用的片段在「编年史」页。';
+    return;
+  }
   box.classList.remove('muted');
   box.innerHTML = story[sid].lines.map((ln, i) => renderLine(ln)
     .replace('<div class="ln', `<div id="L${i + 1}" class="ln${hl.has(i + 1) ? ' hl' : ''}`)).join('');
@@ -116,7 +120,7 @@ async function renderEpisode(sid, hl = new Set()) {
 
 function renderLine([k, sp, t]) {
   if (k === 'd') {
-    const c = D.chars[sp];
+    const c = charOf(sp);
     const cls = c ? c.kind : 'plain';
     const name = sp ? (c ? `<a href="${href.char(sp)}">${esc(sp)}</a>` : esc(sp)) : '（画外音）';
     return `<div class="ln d"><span class="sp ${cls}" title="${esc(sp)}">${name}</span><span>${esc(t)}</span></div>`;

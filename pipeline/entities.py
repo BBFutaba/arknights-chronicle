@@ -43,12 +43,22 @@ class Power:
     match: list[str] = field(default_factory=list)
 
 
+def _book_aliases() -> dict[str, str]:
+    """编年史的别名表（data/annals/别名.md）：每行「别名=正名」，同一个人只留一个人物页。"""
+    path = config.ROOT / "data" / "annals" / "别名.md"
+    if not path.exists():
+        return {}
+    pairs = (s.strip().split("=", 1) for s in path.read_text(encoding="utf-8").splitlines()
+             if "=" in s and not s.startswith("<!--"))
+    return {a.strip(): b.strip() for a, b in pairs}
+
+
 class Registry:
     def __init__(self):
         with open(config.CURATED / "entities.toml", "rb") as f:
             cur = tomllib.load(f)
         sp = cur.get("speakers", {})
-        self.aliases: dict[str, str] = cur.get("aliases", {})
+        self.aliases: dict[str, str] = {**cur.get("aliases", {}), **_book_aliases()}
         self.ignore = set(sp.get("ignore", []))
         self.generic_suffixes = tuple(sp.get("generic_suffixes", []))
         self.keep = set(sp.get("keep", []))
@@ -104,14 +114,35 @@ class Registry:
                 ch = self.op_by_name.get(c["name"]) or self._operator(c)
             self._register_operator(cid, c, ch)
         for alias, target in self.aliases.items():
-            if target in self.op_by_name:
-                ch = self.op_by_name[target]
-                if alias not in ch.aliases:
-                    ch.aliases.append(alias)
+            self._merge_alias(alias, target)
+
+    def _merge_alias(self, alias: str, target: str):
+        """别名和正名合成一个人物，名字用正名。两边都是干员时（电弧、Raidian）档案优先用正名的。"""
+        a, t = self.op_by_name.get(alias), self.op_by_name.get(target)
+        if a is None and t is None:
+            return  # 两边都是 NPC，建人物时再记别名
+        if t is None:  # 正名不是干员（送葬人=费德里科）：这个干员改用正名
+            del self.chars[alias]
+            a.name = target
+            self.chars[target] = t = self.op_by_name[target] = a
+        elif a is not None and a is not t:
+            t.char_ids += a.char_ids
+            t.powers += [p for p in a.powers if p not in t.powers]
+            t.aliases += [n for n in a.aliases if n not in t.aliases]
+            del self.chars[alias]
+            for cid in a.char_ids:
+                self.op_by_id[cid] = t
+            for n, c in self.op_by_name.items():
+                if c is a:
+                    self.op_by_name[n] = t
+        self.op_by_name[alias] = t
+        if alias not in t.aliases:
+            t.aliases.append(alias)
 
     def canonical(self, raw: str) -> str:
         name = raw.strip().strip("“”\"「」『』")
-        return self.aliases.get(name, name)
+        # 「Mantra？」：身份未揭晓时的写法，和「Mantra」是同一个人
+        return self.aliases.get(name) or self.aliases.get(name.rstrip("？?")) or name
 
     def is_generic(self, name: str) -> bool:
         if name in self.keep:
@@ -137,7 +168,7 @@ class Registry:
             return None
         ch = self.chars.get(name)
         if ch is None:
-            ch = self.chars[name] = Character(name, "npc")
+            ch = self.chars[name] = Character(name, "npc", aliases=[a for a, t in self.aliases.items() if t == name])
         return ch
 
     def resolve_portrait(self, base: str) -> Character | None:

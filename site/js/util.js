@@ -6,7 +6,7 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
 
 const enc = encodeURIComponent;
 export const href = {
-  char: (n) => `#/chars/${enc(n)}`,
+  char: (n) => `#/chars/${enc(D.charAlias?.[n] ?? n)}`,
   power: (id) => `#/powers/${enc(id)}`,
   group: (gid) => `#/story/${enc(gid)}`,
   ep: (sid) => `#/story/${enc(D.epById[sid]?.group.id ?? '')}/${enc(sid)}`,
@@ -40,8 +40,13 @@ export function groupLabel(g) {
   return g.chapter != null ? `${g.label} ${g.name}` : g.name;
 }
 
+// 人物：name 可以是正名，也可以是别名
+export function charOf(name) {
+  return D.chars[name] ?? D.chars[D.charAlias?.[name]];
+}
+
 export function charChip(name, extra = '') {
-  const c = D.chars[name];
+  const c = charOf(name);
   const cls = c ? `chip chip-${c.kind}` : 'chip chip-plain';
   return c ? `<a class="${cls}" href="${href.char(name)}">${esc(name)}${extra}</a>`
     : `<span class="${cls}">${esc(name)}${extra}</span>`;
