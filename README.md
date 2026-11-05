@@ -82,6 +82,7 @@ site/
 | 主线、活动、故事集 | `story_review_table`（游戏内「剧情回顾」） | `main_9`、`act13side` 等 | 游戏的 storyId，如 `act13side_level_act13side_01_beg` |
 | 活动隐藏剧情 | `story_review_meta_table` 的活动档案，并入所属活动组、排在原有分集之后 | 所属活动 | `组id_剧本文件名`，如 `act13side_level_act13side_hidden_st01` |
 | 干员密录 | `handbook_info_table` 的 `handbookAvgList`，一位干员一个组，组名是干员名 | 干员 id，如 `char_427_vigil` | 游戏的 storyId，如 `story_vigil_set_2_story_1` |
+| 集成战略、生息演算、其他文本 | 原始 `story/` 目录里剧情回顾之外的文本（结局、月度记录、记录点、活动任务和手册），标题来自各数据表 | `rogue_4`、`sandbox_1`、`record_main_13` 等 | `组id_文件名` |
 
 - 隐藏剧情游戏里没有关卡代号，按 PRTS 的写法编作 `NL-HD-1` 等，分集类型记作「幕间」。目前只有《长夜临光》的「逃离」「选择」「路漫漫」三篇。
 - 干员密录的分集标题写作「干员名 · 密录标题」，一套分几篇的加「（1）」「（2）」。
