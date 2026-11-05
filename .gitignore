@@ -12,3 +12,5 @@ __pycache__/
 StoryText/
 # 公开版网页，由 python -m pipeline.publish 生成，部署到 gh-pages 分支
 /dist/
+# 单文件本地版，含剧本全文，由 python -m pipeline.bundle 生成，不要上传
+/明日方舟编年史-完整版.html
