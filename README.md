@@ -23,7 +23,6 @@
 
 - 剧本、干员档案、敌人图鉴：[Kengxxiao/ArknightsGameData](https://github.com/Kengxxiao/ArknightsGameData)，版权归鹰角网络。
 - 参考的年表：[PRTS「泰拉年表」](https://prts.wiki/w/泰拉年表)，CC BY-NC-SA 4.0。日期是社区根据剧情推测的，可能有偏差。
-- 书外材料：设定集《大地巡旅》、官方影片、官方漫画、微博图文《泰拉记事》，版权归鹰角网络。原件和 OCR 全文放在 `Raw Data/`，不进 git，不进公开版；书里只录短引。
 - 编者文字：纲、目、考异、纪事本末、列传和博物志的正文，按 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 发布，转载和再创作的约定见网页的「凡例」页。
 
 ## 协议
@@ -82,7 +81,6 @@ pipeline/
   profiles.py site.py                             干员档案和 NPC 简介；导出 site/data/*.json
   annals.py timeclues.py                          编年史和博物志：查剧本、取引文、校验、导出；提取时间线索
   publish.py bundle.py deploy.py                  公开版；单文件版；上线
-  comics.py records.py ocr_gpu.py ocr_tool.py     书外材料：下载官方漫画和《泰拉记事》，OCR
 data/
   annals/          书稿（只含出处指令和短引，不含全文）
   curated/entities.toml  人工维护：别名、同名区分、路人过滤、单字名字、补充的地区势力
@@ -93,8 +91,6 @@ site/
   vendor/force-graph.min.js    关系图库（force-graph 1.52.0）
   data/                        生成的数据（git 忽略）
 ```
-
-`Raw Data/`（书外材料）、`annals/`（导出的成书）、`dist/`（公开版）也都在 git 之外。
 
 ## 剧情范围
 
@@ -108,15 +104,6 @@ site/
 - 隐藏剧情游戏里没有关卡代号，按 PRTS 的写法编作 `NL-HD-1` 等，分集类型记作「幕间」。目前只有《长夜临光》的「逃离」「选择」「路漫漫」三篇。
 - 不收教程、训练和关卡内对话。
 - 这是剧本库的范围，比书宽；入不入书看凡例，如联动活动不入正史。
-
-## 识别规则
-
-- **说话人 → 人物**：先查 `entities.toml` 的 `[aliases]` 和 `data/annals/别名.md`（一人多名，合成一个人物页，如 Logos = 逻各斯、恩希欧迪斯 = 银灰），再匹配干员名；异格干员并入本体；「A&B」拆成两人，「阿米娅？」归到阿米娅；剧本选项算博士的台词。路人（「整合运动成员」「士兵A」）、以势力名说话的、「？？？」不建人物。同一个名字在不同剧情里指不同的人时，在 `entities.toml` 的 `[scoped_aliases]` 里按分集或组改写。
-- **立绘**：对得上干员 id 的，没说话也算出场。
-- **提及地区势力**：名字在一集台词和旁白里出现至少 2 次。
-- **PRTS 年表**：事件描述按名字最长优先匹配人物和地区势力；出处按「编号 标题/BEG|END|NBT」或「干员/干员密录/第几套[-第几篇]」对应到分集。
-
-`python -m pipeline.check` 会列出疑似干员的说话人写法和被过滤的高频说话人，确认后写进 `entities.toml`。
 
 ## 进度
 
