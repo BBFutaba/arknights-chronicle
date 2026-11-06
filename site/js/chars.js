@@ -19,7 +19,7 @@ export function mount(el, r) {
       <a class="small bw-link ch-power-link" hidden></a>
       <select class="ch-sort">
         <option value="appear">按出场集数</option><option value="lines">按台词数</option>
-        <option value="events">按年表事件数</option><option value="name">按名字</option></select>
+        <option value="events">按事件数</option><option value="name">按名字</option></select>
       <div class="list"></div>
     </aside>
     <section class="content panel"></section>`;
@@ -112,7 +112,7 @@ function renderProfile(name) {
       <div>
         ${c.co.length ? `<h4>常同场人物（共同出场集数）</h4><div class="chips">${c.co.map(([n, k]) => charChip(n, `<span class="n">${k}</span>`)).join('')}</div>` : ''}
         ${annalsSection(name)}
-        ${evs.length ? `<h4>年表中的相关事件（${evs.length}）</h4>${evs.map(eventItem).join('')}` : ''}
+        ${evs.length ? `<h4>相关事件（${evs.length}）</h4>${evs.map(eventItem).join('')}` : ''}
       </div>
     </div>`;
 }

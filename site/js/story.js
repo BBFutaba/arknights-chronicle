@@ -73,7 +73,7 @@ function renderGroup(g) {
       <a class="ep-item" href="${href.ep(e.id)}">
         <span><span class="code">${esc(e.code || e.title)}</span><span class="avg">${esc(e.code ? e.title : '')} ${esc(e.avg)}</span></span>
         <span class="syn">${esc(e.synopsis)}</span></a>`).join('')}</div>
-    ${evs.length ? `<h4>年表中的相关事件</h4>${evs.map(eventItem).join('')}` : ''}`;
+    ${evs.length ? `<h4>相关事件</h4>${evs.map(eventItem).join('')}` : ''}`;
 }
 
 // ?l=12-18,20-22 → 要高亮的行号集合（编年史引文跳转过来时用）
@@ -100,7 +100,7 @@ async function renderEpisode(sid, hl = new Set()) {
     <div class="chips">${ep.chars.map(([n, l]) => charChip(n, l ? `<span class="n">${l}</span>` : '')).join('')}</div>
     ${ep.others.length ? `<div class="small muted" style="margin-top:6px">其他说话人：${ep.others.map(([n, c]) => `${esc(n)} ${c}`).join(' · ')}</div>` : ''}
     ${ep.stamps.length ? `<div class="small" style="margin-top:6px">📍 ${ep.stamps.map((s) => esc(s.filter(Boolean).join(' · '))).join('；')}</div>` : ''}
-    ${evs.length ? `<h4>年表中的相关事件</h4>${evs.map(eventItem).join('')}` : ''}
+    ${evs.length ? `<h4>相关事件</h4>${evs.map(eventItem).join('')}` : ''}
     ${nav}
     <div class="script muted">正在加载剧本…</div>
     ${nav}`;

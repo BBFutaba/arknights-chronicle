@@ -272,7 +272,6 @@ details[open] > summary { color: var(--text); }
 .an-entry.minor .an-meta { margin-top: 2px; }
 .an-tag { display: inline-block; font-size: 11px; line-height: 17px; padding: 0 5px; margin-right: 6px; border-radius: 4px;
   border: 1px solid var(--line); color: var(--muted); vertical-align: 1px; }
-.an-moved { color: var(--c-faction); }
 .an-cunmu ol { padding-left: 1.6em; font-size: 13.5px; }
 .an-cunmu li { margin: 8px 0; }
 .an-cunmu .when { color: var(--muted); font-size: 12px; margin-right: 8px; }
@@ -282,7 +281,14 @@ details[open] > summary { color: var(--text); }
 .an-index li { margin: 3px 0; }
 .an-index .when { color: var(--muted); margin-right: 8px; font-size: 12px; }
 .an-index strong { font-weight: 500; }
+.an-fanli { padding-left: 1.4em; }
 .an-fanli li { margin: 6px 0; line-height: 1.8; }
+.fanli-page { flex: 1; min-width: 0; overflow-y: auto; }
+.fanli-body { max-width: 760px; margin: 0 auto; padding: 24px 20px 32px; line-height: 1.8; }
+.fanli-body h1 { margin: 4px 0 8px; }
+.fanli-body h2 { font-size: 17px; margin: 28px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.fanli-body .sub { color: var(--muted); font-size: 13px; }
+.fanli-foot { margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; text-align: center; }
 .gang-only .an-mu, .gang-only .an-people, .gang-only .an-quote, .gang-only .an-kaoyi, .gang-only .an-meta { display: none; }
 .gang-only .an-entry { padding: 6px 0; border-bottom: none; }
 .gang-only .an-group + .an-group { margin-top: 4px; padding-top: 4px; border-top: none; }

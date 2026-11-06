@@ -1,4 +1,4 @@
-// 时间轴：竖向的分叉时间线。
+// 时间轴：竖向的分叉时间线。一行是编年史的一个条目，次序和日期以书为准，PRTS 年表只在详情里作参考。
 // 最左边的灰线是「主世界线」，只有设定资料出处的事件画在上面；每个剧情组是一条故事线，
 // 从主世界线分出、结束时合回。同一时期有几条故事线并行，就分出几条。
 // 一条故事线的两个事件之间隔得太远（超过 GAP 行）时会先合回再重新分出，避免一条线占满整列。
@@ -15,7 +15,7 @@ let rowOf = {};      // 事件 id → 行号
 let visible = [];    // 当前筛选后的事件，用于上一条/下一条
 let selected = null;
 let lastFilterKey = null;
-const state = { q: '', cats: new Set(CAT_ORDER), parallel: true, char: null, power: null, thread: null };
+const state = { q: '', cats: new Set(CAT_ORDER), parallel: true, cunmu: false, char: null, power: null, thread: null };
 
 export function mount(el, r) {
   root = el;
@@ -25,11 +25,12 @@ export function mount(el, r) {
       <div class="tl-toggles">
         ${CAT_ORDER.map((c) => `<label class="toggle"><input type="checkbox" value="${c}" ${state.cats.has(c) ? 'checked' : ''}>${c}</label>`).join('')}
         <label class="toggle"><input type="checkbox" class="tl-par" ${state.parallel ? 'checked' : ''}>平行世界</label>
+        <label class="toggle"><input type="checkbox" class="tl-cun" ${state.cunmu ? 'checked' : ''}>PRTS 存目</label>
       </div>
       <div class="tl-active"></div>
       <div class="tl-count muted"></div>
       <nav class="tl-eras"></nav>
-      <p class="muted small">↑↓ 键切换事件。日期为 PRTS 社区根据剧情推测，可能有偏差。标「补」的是 PRTS 年表没有、本书据原文补入的事，日期是本书所系。</p>
+      <p class="muted small">↑↓ 键切换事件。次序、日期和文字以本书编年史为准，PRTS 年表只作参考，见详情。</p>
     </aside>
     <section class="tl-main"><div class="tl-scroll"><div class="tl-canvas"></div></div></section>
     <aside class="tl-detail panel"></aside>`;
@@ -45,6 +46,7 @@ export function mount(el, r) {
     render();
   }));
   el.querySelector('.tl-par').addEventListener('change', (e) => { state.parallel = e.target.checked; render(); });
+  el.querySelector('.tl-cun').addEventListener('change', (e) => { state.cunmu = e.target.checked; render(); });
   canvas.addEventListener('click', (e) => {
     const row = e.target.closest('.tl-row');
     if (row) choose(row.dataset.ev, false);
@@ -80,23 +82,12 @@ function matches(e) {
   const cat = D.threads[e.thread]?.category ?? '设定';
   if (!state.cats.has(cat)) return false;
   if (!state.parallel && e.parallel) return false;
+  if (!state.cunmu && e.cunmu) return false;
   if (state.char && !e.chars.includes(state.char)) return false;
   if (state.power && !e.powers.includes(state.power)) return false;
   if (state.thread && !(e.thread === state.thread || e.sources.some((s) => s.groups.includes(state.thread)))) return false;
   const q = state.q.trim();
-  return !q || e.lines.some((l) => l.includes(q)) || e.when.includes(q);
-}
-
-function yearKey(e) { return e.year != null ? `y${e.year}` : e.era; }
-function yearLabel(e) {
-  if (e.year == null) return e.era.split(' · ').pop();
-  return e.year < 0 ? `前 ${-e.year} 年` : `${e.year} 年`;
-}
-function shortWhen(e) {
-  if (e.sup) return e.when.replace(/^(泰拉历)?[〇一二三四五六七八九十百千]+年/, '').replace(/^（(.*)）$/, '$1') || '全年';
-  if (e.year == null || e.year < 0) return e.when;
-  const rest = e.when.startsWith(`${e.year} 年`) ? e.when.slice(`${e.year} 年`.length).trim() : e.when;
-  return rest.replace(/^（(.*)）$/, '$1') || '全年';
+  return !q || e.lines.some((l) => l.includes(q)) || e.when.includes(q) || (e.prts ?? []).some((p) => p.lines.some((l) => l.includes(q)));
 }
 
 function layout() {
@@ -139,9 +130,9 @@ function render() {
   rowOf = {};
   let lastKey = null;
   for (const e of visible) {
-    if (yearKey(e) !== lastKey) {
-      lastKey = yearKey(e);
-      items.push({ year: yearLabel(e), era: e.era });
+    if (e.head !== lastKey) {
+      lastKey = e.head;
+      items.push({ year: e.head, era: e.era });
     }
     rowOf[e.id] = items.length;
     items.push({ ev: e });
@@ -176,9 +167,9 @@ function render() {
     const g = D.groupById[e.thread];
     const tag = e.thread === 'lore' ? '' : `<span class="tl-tag" style="--c:${threadColor(e.thread)}" title="${esc(t.name)}">${esc(g?.chapter != null ? g.label : t.name)}</span>`;
     const more = e.lines.length > 1 ? `<span class="muted"> +${e.lines.length - 1}</span>` : '';
-    const par = e.parallel ? '<span class="badge">平行</span>' : e.sup ? '<span class="badge">补</span>' : '';
+    const par = e.parallel ? '<span class="badge">平行</span>' : '';
     return `<div class="tl-row${e.id === selected ? ' sel' : ''}" data-ev="${e.id}" style="padding-left:${width + 8}px">
-      <span class="when">${esc(shortWhen(e))}</span>${tag}${par}<span class="text">${esc(e.lines[0] ?? '')}${more}</span></div>`;
+      <span class="when">${esc(e.short)}</span>${tag}${par}<span class="text">${esc(e.lines[0] ?? '')}${more}</span></div>`;
   }).join('');
 
   canvas.style.height = `${height}px`;
@@ -231,10 +222,15 @@ function select(id, scroll) {
       颜色代表故事线（剧情组），灰色空心点是只有设定资料出处的事件。</div>`;
     return;
   }
-  selected = id;
-  canvas.querySelectorAll(`[data-ev="${id}"]`).forEach((n) => n.classList.add('sel'));
-  if (scroll && rowOf[id] != null) {
-    scroller.scrollTop = rowOf[id] * ROW - scroller.clientHeight / 3;
+  selected = ev.id;
+  if (ev.cunmu && !state.cunmu) {  // 从别的页面点进来的存目
+    state.cunmu = true;
+    root.querySelector('.tl-cun').checked = true;
+    render();
+  }
+  canvas.querySelectorAll(`[data-ev="${ev.id}"]`).forEach((n) => n.classList.add('sel'));
+  if (scroll && rowOf[ev.id] != null) {
+    scroller.scrollTop = rowOf[ev.id] * ROW - scroller.clientHeight / 3;
   }
   renderDetail(ev);
 }
@@ -265,7 +261,8 @@ function renderDetail(ev) {
     ${ev.notes.length ? `<div class="note">${ev.notes.map(esc).join('<br>')}</div>` : ''}
     ${ev.chars.length || ev.powers.length ? `<h4>涉及</h4><div class="chips">${ev.chars.map((n) => charChip(n)).join('')}${ev.powers.map((p) => powerChip(p)).join('')}</div>` : ''}
     ${filters ? `<h4>在时间轴中只看</h4><div class="filter-links">${filters}</div>` : ''}
-    <h4>出处</h4><ul class="sources">${sources || '<li class="muted">无</li>'}</ul>`;
+    <h4>出处</h4><ul class="sources">${sources || '<li class="muted">见编年史考异</li>'}</ul>
+    ${ev.prts?.length ? `<h4>PRTS 年表（参考）</h4>${ev.prts.map((p) => `<div class="muted small">${esc(p.when)}</div><div class="ev-lines">${p.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div>${p.notes.length ? `<div class="note">${p.notes.map(esc).join('<br>')}</div>` : ''}`).join('')}` : ''}`;
   detail.querySelectorAll('[data-nav]').forEach((a) => a.addEventListener('click', (e) => {
     e.preventDefault();
     choose(a.dataset.nav, true);

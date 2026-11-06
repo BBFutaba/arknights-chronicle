@@ -34,7 +34,7 @@ export function mount(el, r) {
       <div class="graph-mode"></div>
       <div class="range-row g-min-row">出场 ≥ <input type="range" class="g-min" min="3" max="120" step="1"><b class="g-min-v"></b> 集</div>
       <label class="toggle"><input type="checkbox" class="g-powers">地区与势力</label>
-      <label class="toggle"><input type="checkbox" class="g-events">年表事件</label>
+      <label class="toggle"><input type="checkbox" class="g-events">事件</label>
       <label class="toggle"><input type="checkbox" class="g-doctor">博士</label>
       <details class="g-forces"><summary>力度</summary>
         ${SLIDERS.map(([k, label, min, max, step]) => `

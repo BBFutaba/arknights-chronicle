@@ -1,5 +1,5 @@
 // 编年史：左侧是卷目和月份，右侧按卷连读。考异默认折叠。条目的渲染也给列传、纪事本末用。
-// 路由：#/annals/1097（一卷）、#/annals/1097?e=ev0536（跳到某条）、#/annals/1097?s=正月（跳到某月）、#/annals/凡例
+// 路由：#/annals/1097（一卷）、#/annals/1097?e=ev0536（跳到某条）、#/annals/1097?s=正月（跳到某月）
 import { D } from './data.js';
 import { esc, href, charChip, charOf } from './util.js';
 
@@ -22,14 +22,10 @@ export function mount(el, r) {
 export function update(r) {
   if (!content) return;
   const [a] = r.parts;
-  let vol = null;
-  if (a === '凡例') renderFanli();
-  else {
-    vol = D.annals.volumes.find((v) => String(v.year) === a)
-      ?? D.annals.volumes.find((v) => v.year === 1096) ?? D.annals.volumes[0];
-    renderVolume(vol);
-  }
-  renderSide(vol, a === '凡例' ? '凡例' : null);
+  const vol = D.annals.volumes.find((v) => String(v.year) === a)
+    ?? D.annals.volumes.find((v) => v.year === 1096) ?? D.annals.volumes[0];
+  renderVolume(vol);
+  renderSide(vol);
   jump(r.params, vol);
 }
 
@@ -39,7 +35,7 @@ export function unmount() {
 
 // ---------------------------------------------------------------- 左栏
 
-function renderSide(vol, activeOther) {
+function renderSide(vol) {
   // 前纪、外纪在主线之前：分两段显示
   const group = (v) => (v.year === '不系年' ? '不系年' : typeof v.year === 'number' && v.year >= 1096 ? '主线' : '前纪与外纪');
   const vols = D.annals.volumes.map((v, i, all) => {
@@ -54,9 +50,7 @@ function renderSide(vol, activeOther) {
         <span class="grow">${esc(v.title.replace(/^泰拉历/, ''))}</span><span class="n">${v.stats.gang} 纲</span></a>${toc}`;
   }).join('');
   side.innerHTML = `
-    <div class="list-head">编年 · 按年</div>${vols}
-    <div class="list-head">说明</div>
-    <a class="list-item${activeOther === '凡例' ? ' active' : ''}" href="#/annals/凡例"><span class="grow">凡例</span></a>`;
+    <div class="list-head">编年 · 按年</div>${vols}`;
 }
 
 const countGang = (s) => s.days.reduce((n, d) => n + d.entries.reduce((m, e) => m + e.groups.length, 0), 0);
@@ -73,7 +67,7 @@ function renderVolume(v) {
   content.innerHTML = `<div class="an-body">
     <div class="sub">刻舟录</div>
     <h1>${esc(v.title)}</h1>
-    <div class="sub">${st.entries} 条年表事件 · ${st.gang} 组纲目 · ${st.quotes} 段原文 · 撰文 ${st.prose.toLocaleString()} 字，引文 ${st.quote_chars.toLocaleString()} 字 · <a href="#/annals/凡例">凡例</a></div>
+    <div class="sub">${st.entries} 条 · ${st.gang} 组纲目 · ${st.quotes} 段原文 · 撰文 ${st.prose.toLocaleString()} 字，引文 ${st.quote_chars.toLocaleString()} 字 · <a href="#/fanli">凡例</a></div>
     ${controlsHtml()}
     ${v.sections.map((s) => `
       <section class="an-sec" id="${secId(v.year, s.label)}">
@@ -90,19 +84,6 @@ function renderVolume(v) {
       ${next ? `<a class="btn" href="${href.annals(next.year)}">${esc(next.title)} →</a>` : '<span></span>'}
     </div></div>`;
   wireControls(content);
-}
-
-function renderFanli() {
-  if (shown === 'fanli') return;
-  shown = 'fanli';
-  content.innerHTML = `<div class="an-body">
-    <div class="sub">刻舟录</div>
-    <h1>凡例</h1>
-    <ul class="an-fanli">${D.annals.fanli.map((l) => `<li>${inline(l)}</li>`).join('')}</ul>
-    <h4>各卷</h4>
-    ${D.annals.volumes.map((v) => `<p><a class="btn" href="${href.annals(v.year)}">${esc(v.title)}</a>
-      <span class="muted small">${v.stats.gang} 组纲目，${v.stats.quotes} 段原文</span></p>`).join('')}
-  </div>`;
 }
 
 export function controlsHtml() {
@@ -150,15 +131,13 @@ export function entryHtml(e, withWhen = false) {
   const evLinks = e.ids.filter((i) => D.eventById[i])
     .map((i) => `<a href="${href.event(i)}">时间轴：${esc(D.eventById[i].when)}</a>`);
   const benmo = e.benmo.map((t) => `<a href="${href.benmo(t)}">纪事本末：${esc(t)}</a>`);
-  const moved = e.moved ? [`<span class="an-moved" title="原文另有依据，见考异">PRTS 系于 ${esc(e.moved)}，今改系</span>`]
-    : e.sup ? ['<span class="an-moved" title="年表未列，据原文补立">补条：年表不载</span>'] : [];
   benmo.push(...(e.zhuan ?? []).map((n) => `<a href="${href.zhuan(n)}">列传：${esc(n)}传</a>`));
   if (e.minor) {
     // 附记：只有纲和考异，小字附在当日
     return `<article class="an-entry minor" id="an-${e.id}">
       ${withWhen ? `<div class="an-when"><a href="${href.annals(e.year, e.id)}">${esc(e.when)}</a></div>` : ''}
       ${e.groups.map((g) => `<div class="an-gang"><span class="an-tag">附</span>${inline(g.gang)}</div>${kaoyiHtml(g.kaoyi)}`).join('')}
-      <div class="an-meta">${[...moved, ...evLinks, ...benmo].join('<span class="dot">·</span>')}</div>
+      <div class="an-meta">${[...evLinks, ...benmo].join('<span class="dot">·</span>')}</div>
     </article>`;
   }
   return `<article class="an-entry" id="an-${e.id}">
@@ -171,7 +150,7 @@ export function entryHtml(e, withWhen = false) {
       ${g.quotes.map(quoteHtml).join('')}
       ${kaoyiHtml(g.kaoyi)}
     </div>`).join('')}
-    <div class="an-meta">${[...moved, ...evLinks, ...benmo].join('<span class="dot">·</span>')}</div>
+    <div class="an-meta">${[...evLinks, ...benmo].join('<span class="dot">·</span>')}</div>
   </article>`;
 }
 

@@ -10,7 +10,7 @@
 - **纪事本末**：一件事一页，按事连读。索引可按时期、地区、性质、了局（已了、未了、悬案）筛选和分组。
 - **列传**：一人一篇。索引可按出身、盖棺（盖棺定论、来日方长、生死未卜、异数）、族裔、所属、首见、身份筛选和分组。
 
-- **时间轴**：竖向分叉时间线。最左边的灰线是主世界线；每个剧情组是一条故事线，从主世界线分出、结束时合回，同一时期并行的故事线并排显示。事件来自 PRTS「泰拉年表」，加上编年史里年表没有、据原文补入的条目（标「补」），可按人物、地区势力、故事线和文字筛选，↑↓ 键逐条浏览。
+- **时间轴**：竖向分叉时间线。最左边的灰线是主世界线；每个剧情组是一条故事线，从主世界线分出、结束时合回，同一时期并行的故事线并排显示。一行是编年史的一个条目，次序、日期和文字都以编年史为准；PRTS「泰拉年表」只作参考，原文和原日期列在详情里，书中不录的存目可以打开开关查看。可按人物、地区势力、故事线和文字筛选，↑↓ 键逐条浏览。
 - **剧情**：章节和活动目录 → 分集阅读（官方简介、出场人物、年表相关事件、剧本全文）。
 - **人物**：干员档案、敌人图鉴里的 NPC 简介、出场剧情、相关事件、常同场人物。
 - **博物志**：地理、势力、族裔、源石、科技、人文、生灵、远古八门的百科，按门列目录，可搜可筛。地理、势力两门列出全部地区势力，一地一页：条目正文在上，下面接层级、成员、相关事件、提及它的剧情；还没写正文的标「尚未成文」。每条底部有「书中提及」，统计编年史纲目和列传里写到它的地方。见下文「博物志」。
@@ -19,10 +19,20 @@
 ## 数据来源与版权
 
 - 剧本、干员档案、敌人图鉴：[Kengxxiao/ArknightsGameData](https://github.com/Kengxxiao/ArknightsGameData)，版权归鹰角网络。
-- 年表事件：[PRTS「泰拉年表」](https://prts.wiki/w/泰拉年表)，CC BY-NC-SA 4.0。日期是社区根据剧情推测的，可能有偏差。
+- 参考的年表：[PRTS「泰拉年表」](https://prts.wiki/w/泰拉年表)，CC BY-NC-SA 4.0。日期是社区根据剧情推测的，可能有偏差。
 - 书外材料：设定集《大地巡旅》、官方影片、官方漫画、微博图文《泰拉记事》，版权归鹰角网络。原件和 OCR 全文放在 `Raw Data/`，不进 git，不进公开版；书里只录短引。
+- 编者文字：纲、目、考异、纪事本末、列传和博物志的正文，按 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 发布，转载和再创作的约定见网页的「凡例」页。
 
 本地版网页（`site/`）有剧本全文，**只在本地使用，不要公开发布**。公开版由 `python -m pipeline.publish` 生成到 `dist/`，只含编年史和它引用的片段，去掉了剧本全文和干员档案正文，挂在 GitHub Pages 上。
+
+## 协议
+
+| 内容 | 协议 |
+|---|---|
+| 代码：`pipeline/`、`site/` 的网页代码 | MIT，见 [LICENSE](LICENSE) |
+| 书的文字：`data/annals/`、`data/curated/` | CC BY-NC-SA 4.0，见 [data/LICENSE.md](data/LICENSE.md) |
+| 书中引用的游戏内容 | 版权归鹰角网络，不在上述授权之内 |
+| 关系图库 `site/vendor/force-graph.min.js` | MIT，见 [site/vendor/force-graph.LICENSE](site/vendor/force-graph.LICENSE) |
 
 ## 使用
 
@@ -73,6 +83,7 @@ pipeline/
   site.py          导出 site/data/*.json
   annals.py        编年史和博物志：查剧本、取引文、校验、导出
   publish.py       生成公开版网页（dist/），去掉剧本全文和干员档案正文
+  deploy.py        上线：构建，推送 main，更新 gh-pages 和 GitHub Release
   bundle.py        把网页打包成一个 HTML 文件：本地版（刻舟录-完整版.html，只在本地用）；加 --public 打包公开版（刻舟录-公开版.html，传到 GitHub Release）
   records.py       下载《泰拉记事》到 Raw Data/（经 PRTS，有间隔，遇 403/429 就停）
   comics.py        下载官方漫画到 Raw Data/
@@ -84,7 +95,7 @@ data/
   structured/      episodes.jsonl：每集的结构化结果，留给后续 AI 抽取（git 忽略）
 site/
   index.html, style.css, js/   网页（原生 JS 模块，不需要打包）
-  vendor/force-graph.min.js    关系图库（force-graph 1.52.0，MIT，github.com/vasturiano/force-graph）
+  vendor/force-graph.min.js    关系图库（force-graph 1.52.0，MIT，github.com/vasturiano/force-graph，声明见同目录 force-graph.LICENSE）
   data/                        生成的数据（git 忽略）
 ```
 

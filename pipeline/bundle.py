@@ -88,6 +88,7 @@ def main() -> int:
     html = (src / "index.html").read_text(encoding="utf-8")
     css = (src / "style.css").read_text(encoding="utf-8")
     vendor = (src / "vendor" / "force-graph.min.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
+    vendor = f"/*\n{(src / 'vendor' / 'force-graph.LICENSE').read_text(encoding='utf-8')}*/\n{vendor}"
     js = bundle_js(src).replace("</script", "<\\/script")
     blobs, raw = [], 0
     for path in sorted(data_dir.rglob("*.json")):

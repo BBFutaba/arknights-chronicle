@@ -554,7 +554,7 @@ def parse_entries(path: Path, probs: Problems) -> list[Entry]:
             probs.add(e.where, f"{tag} 是存目，不能标归属")
         # 只见于书外（设定集、影片、漫画）的事按凡例只书纲，所以补条也可以是附记，靠考异交代出处
         if e.sup and not has_kaoyi:
-            probs.add(e.where, f"{tag} 是补条，要有考异（写明年表不载与日期依据）")
+            probs.add(e.where, f"{tag} 是补条，要有考异（写明日期依据）")
         if e.sup and e.main and not any(g["quotes"] for g in e.groups):
             probs.add(e.where, f"{tag} 是立条的补条，要有原文；只见于书外的事写成附记（加 附）")
     return out
@@ -1343,11 +1343,23 @@ def entry_json(e: Entry, benmo_titles: list[str]) -> dict:
     }
 
 
-def fanli_lines() -> list[str]:
+def fanli_lines() -> list[dict]:
+    """凡例分节导出：## 是小标题，- 是条目，其余是段落；开头的 # 标题不要。"""
     path = SRC_DIR / "凡例.md"
     if not path.exists():
         return []
-    return [l[2:].strip() for l in path.read_text(encoding="utf-8").splitlines() if l.startswith("- ")]
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or (s.startswith("# ")):
+            continue
+        if s.startswith("## "):
+            out.append({"type": "head", "text": s[3:].strip()})
+        elif s.startswith("- "):
+            out.append({"type": "item", "text": s[2:].strip()})
+        else:
+            out.append({"type": "text", "text": s})
+    return out
 
 
 MD_LINK = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")

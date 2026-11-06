@@ -1,4 +1,4 @@
-// 顶栏全局搜索：人物、博物志（含全部地区势力）、剧情组、分集、年表事件。
+// 顶栏全局搜索：人物、博物志（含全部地区势力）、剧情组、分集、事件。
 import { D } from './data.js';
 import { esc, href, epLabel, groupLabel, KIND_LABEL } from './util.js';
 

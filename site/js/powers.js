@@ -18,7 +18,7 @@ export function powerSections(id) {
     ${p.members.length ? `<h4>${p.kind === 'region' ? '出身干员' : '成员'}（${p.members.length}）</h4>
       <div class="chips">${p.members.slice(0, MEMBER_LIMIT).map((n) => charChip(n)).join('')}${p.members.length > MEMBER_LIMIT ? `<span class="muted small">等 ${p.members.length} 人</span>` : ''}</div>` : ''}
     <div class="cols">
-      <div>${evs.length ? `<h4>年表中的相关事件（${evs.length}）</h4>${evs.map(eventItem).join('')}` : '<h4>年表中的相关事件</h4><p class="muted">无</p>'}</div>
+      <div>${evs.length ? `<h4>相关事件（${evs.length}）</h4>${evs.map(eventItem).join('')}` : '<h4>相关事件</h4><p class="muted">无</p>'}</div>
       <div><h4>提及${p.kind === 'region' ? '此地' : '该势力'}的剧情</h4>
         ${mentions.length ? mentions.map(([gid, eps]) => {
           const g = D.groupById[gid];
