@@ -32,7 +32,7 @@ site/data/bowu.json（网页「博物志」页用），只含编者文字和条�
     python -m pipeline.annals zhuan <人物>            列出某人列传收录的条目，供写概述
     python -m pipeline.annals benmo <事名>            列出某件纪事本末的概述和所收条目
     python -m pipeline.annals long <稿件路径>         列出目超过三百字的组，删定用
-    python -m pipeline.annals rawfind <正则>          在全部原始游戏文本里搜索（含没收进剧本库的）
+    python -m pipeline.annals rawfind <正则> [上限]   在全部原始游戏文本里搜索（含没收进剧本库的），上限 0 是全部
     python -m pipeline.annals quotes [输出文件]       核对纲目考异和博物志里的短引，列出全部文本里都找不到的
 """
 from __future__ import annotations
@@ -820,6 +820,79 @@ def load_liezhuan(probs: Problems) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- 列传、纪事本末的索引
+
+# 一行一篇，竖线分列，# 开头的是说明。写法见 列传索引须知.md。
+ZHUAN_FIELDS = ("name", "origin", "place", "race", "factions", "fate", "died", "ev", "note", "basis")
+BENMO_FIELDS = ("title", "regions", "kind", "end", "note")
+ORIGINS = ("乌萨斯", "炎", "东", "维多利亚", "塔拉", "卡西米尔", "莱塔尼亚", "拉特兰", "叙拉古", "伊比利亚", "阿戈尔", "玻利瓦尔",
+           "哥伦比亚", "米诺斯", "雷姆必拓", "谢拉格", "萨尔贡", "萨米", "卡兹戴尔", "汐斯塔", "罗德岛", "前文明", "深海", "未详")
+FATES = ("已", "未", "未卜", "异数")
+BENMO_KINDS = ("战争与动乱", "政争与改制", "案件与阴谋", "灾变与异变", "迁徙与营建", "赛会与外交", "探险与寻秘")
+BENMO_ENDS = ("已了", "未了", "悬案")
+SPLIT_NAMES = re.compile(r"[、,，]")
+
+
+def index_rows(pattern: str, fields: tuple[str, ...]) -> list[tuple[str, dict]]:
+    rows = []
+    for path in sorted(SRC_DIR.glob(pattern)):
+        for no, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            s = raw.strip()
+            if s and not s.startswith("#"):
+                cells = [c.strip() for c in s.split("|")]
+                rows.append((f"{path.name}:{no}", dict(zip(fields, cells + [""] * len(fields)))))
+    return rows
+
+
+def zhuan_index(probs: Problems, anchors: set[str], names: set[str], pattern: str = "列传索引-*.md") -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for where, r in index_rows(pattern, ZHUAN_FIELDS):
+        name = r["name"]
+        if name not in names:
+            probs.add(where, f"列传里没有「{name}」")
+        if name in out:
+            probs.add(where, f"「{name}」重复")
+        if r["origin"] not in ORIGINS:
+            probs.add(where, f"{name}：出身「{r['origin']}」要写 {'、'.join(ORIGINS)} 之一")
+        if r["fate"] not in FATES:
+            probs.add(where, f"{name}：盖棺「{r['fate']}」要写 {'、'.join(FATES)} 之一")
+        if r["ev"] and r["ev"] not in anchors:
+            probs.add(where, f"{name}：条「{r['ev']}」不存在")
+        if r["fate"] == "已" and not r["died"]:
+            probs.add(where, f"{name}：已盖棺要写卒（年份，不知道写「不详」）")
+        if not r["basis"]:
+            probs.add(where, f"{name}：要写依据")
+        out[name] = {"origin": r["origin"], "place": r["place"], "race": r["race"],
+                     "factions": [v for v in (x.strip() for x in SPLIT_NAMES.split(r["factions"])) if v],
+                     "fate": r["fate"], "died": r["died"], "ev": r["ev"], "note": r["note"]}
+    return out
+
+
+def benmo_index(probs: Problems, titles: set[str]) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for where, r in index_rows("本末索引.md", BENMO_FIELDS):
+        if r["title"] not in titles:
+            probs.add(where, f"纪事本末里没有「{r['title']}」")
+        if r["kind"] not in BENMO_KINDS:
+            probs.add(where, f"{r['title']}：性质「{r['kind']}」要写 {'、'.join(BENMO_KINDS)} 之一")
+        if r["end"] not in BENMO_ENDS:
+            probs.add(where, f"{r['title']}：了局「{r['end']}」要写 {'、'.join(BENMO_ENDS)} 之一")
+        out[r["title"]] = {"regions": [v for v in (x.strip() for x in SPLIT_NAMES.split(r["regions"])) if v],
+                           "kind": r["kind"], "end": r["end"], "note": r["note"]}
+    return out
+
+
+def check_index(path: str) -> int:
+    """python -m pipeline.annals idx <列传索引文件>：只查这个文件的格式和取值。"""
+    probs = Problems()
+    anchors = {e.anchor for year in volume_years() for e in load_volume(year, Problems())}
+    rows = zhuan_index(probs, anchors, {z["name"] for z in load_liezhuan(Problems())}, Path(path).name)
+    for p in probs:
+        print("  !", p)
+    print(f"{len(rows)} 行，问题 {len(probs)} 处")
+    return 1 if probs else 0
+
+
 # ---------------------------------------------------------------- 博物志
 
 WU_DIR = SRC_DIR / "博物志"
@@ -831,8 +904,10 @@ WU_FIELD = re.compile(r"^【(释|说|沿革|见|考异)】\s*(.*)$")
 WU_BLOCK = {"释": "shi", "说": "shuo", "沿革": "yange", "见": "see"}
 WU_SEE = re.compile(r"(条|传|事|物)[:：](.+)")
 SPLIT_LIST = re.compile(r"[,，]")
-# 书外引文只录短句，不解析行号：@书 书名 p.页 说话人 「短引」，@影 片名 时间 说话人 「短引」，@漫 书名 话 p页 说话人 「短引」
+# 书外引文只录短句，不解析行号：@书 书名 p.页 说话人 「短引」，@影 片名 时间 说话人 「短引」，@漫 书名 话 p页 说话人 「短引」，
+# @记 篇名 说话人 「短引」（《泰拉记事》，篇名中间不留空格）
 EXT_PAGE = re.compile(r"^(.+?)\s+(p\.\S+|p\d\S*)\s*([^「]*?)\s*「(.+)」\s*$")
+EXT_RECORD = re.compile(r"^(\S+?)\s*(?:\s([^「]*?))?\s*「(.+)」\s*$")
 EXT_TIME = re.compile(r"^(.+?)\s+(\d{1,2}:\d{2}(?::\d{2})?(?:[-~]\d{1,2}:\d{2}(?::\d{2})?)?)\s*([^「]*?)\s*「(.+)」\s*$")
 BOOK_SIGN = {"埃里克森": "E.E. 埃里克森"}  # 设定集是世界观内的人物写的，网页上按本人署名
 SHORT_MAX = 80     # 书外短引超过这个字数给提示：全文不进网页数据
@@ -901,14 +976,16 @@ def wu_profile_quote(args: str, where: str, probs: Problems) -> dict | None:
 
 
 def ext_quote(kind: str, args: str, where: str, probs: Problems, notes: list[str]) -> dict | None:
-    """@书、@影、@漫：只留短引和出处。说话人可以不写。"""
-    m = (EXT_TIME if kind == "@影" else EXT_PAGE).match(args)
+    """@书、@影、@漫、@记：只留短引和出处。说话人可以不写。"""
+    m = {"@影": EXT_TIME, "@记": EXT_RECORD}.get(kind, EXT_PAGE).match(args)
     if not m:
         probs.add(where, f"{kind} 格式不对：{args}（见 data/annals/博物志须知.md）")
         return None
-    head, loc, who, text = m.groups()
+    head, loc, who, text = (m[1], "", m[2] or "", m[3]) if kind == "@记" else m.groups()
     if len(text) > SHORT_MAX:
         notes.append(f"{where} {kind} 短引偏长（{len(text)} 字），书外引文只录短句")
+    if kind == "@记":
+        return {"type": "record", "title": head, "who": who, "text": text}
     if kind == "@书":
         return {"type": "book", "title": head, "page": loc, "who": who, "sign": BOOK_SIGN.get(who, who), "text": text,
                 "style": "note" if who.endswith("批注") else "author" if who in BOOK_SIGN else "quote"}
@@ -923,7 +1000,7 @@ def wu_quote(kind: str, args: str, where: str, probs: Problems, notes: list[str]
         return story_quote(args, where, probs)
     if kind == "@档":
         return wu_profile_quote(args, where, probs)
-    if kind in ("@书", "@影", "@漫"):
+    if kind in ("@书", "@影", "@漫", "@记"):
         return ext_quote(kind, args, where, probs, notes)
     probs.add(where, f"不认识的指令：{kind}")
     return None
@@ -939,7 +1016,7 @@ def wu_line(w: Wu, field: str, s: str, where: str, probs: Problems, notes: list[
         q = wu_quote(kind, args.strip(), where, probs, notes)
         if q:
             w.fields[WU_BLOCK[field]].append(q)
-            if q["type"] in ("book", "video", "comic"):
+            if q["type"] in ("book", "video", "comic", "record"):
                 w.ext.append((where, q))
     elif field == "见":
         for tok in s.split():
@@ -1130,6 +1207,8 @@ def raw_files(q: dict) -> list[Path]:
         return [p for p in [RAW_DIR / q["title"] / "全文.txt"] if p.exists()]
     if q["type"] == "video":
         return [p for p in (RAW_DIR / "视频" / "字幕").glob("*.txt") if title in squeeze(p.stem)]
+    if q["type"] == "record":
+        return [p for p in (RAW_DIR / "泰拉记事").glob("*/ocr.txt") if title in squeeze(p.parent.name)]
     return [p for p in (RAW_DIR / "漫画").glob("*/ocr.txt") if title in squeeze(p.parent.name)]
 
 
@@ -1368,7 +1447,7 @@ def build(quiet: bool = False) -> int:
             "cunmu": [{"id": e.anchor, "ids": e.ids, "prts": e.prts_when, "gang": e.groups[0]["gang"] if e.groups else "",
                        "kaoyi": [k for g in e.groups for k in g["kaoyi"]]} for e in cunmu],
         })
-        md = [f"# 明日方舟编年史 · {volume_title(year)}", ""]
+        md = [f"# 刻舟录 · {volume_title(year)}", ""]
         for s in secs:
             md += [f"## {s['label']}", ""]
             for d in s["days"]:
@@ -1390,6 +1469,12 @@ def build(quiet: bool = False) -> int:
             if hits:
                 print(f"  ~ 书法：纲目里有 {sum(hits.values())} 处不合用词（{'、'.join(f'{w}×{n}' for w, n in hits.most_common())}），"
                       f"用 check 看具体位置")
+    index_b = benmo_index(probs, titles)
+    index_z = zhuan_index(probs, {e.anchor for e in all_entries}, names)
+    for title in sorted(titles - index_b.keys()):
+        probs.add("本末索引.md", f"「{title}」还没有索引")
+    for name in sorted(names - index_z.keys()):
+        probs.add("列传索引", f"「{name}」还没有索引")
     for b in benmo:
         es = members[b["title"]]
         if not es:
@@ -1397,7 +1482,7 @@ def build(quiet: bool = False) -> int:
             continue
         data["benmo"].append({
             "title": b["title"], "summary": b["summary"], "span": [es[0].when(True), es[-1].when(True)],
-            "entries": [{"year": e.vol, "id": e.anchor} for e in es],
+            "entries": [{"year": e.vol, "id": e.anchor} for e in es], "index": index_b.get(b["title"]),
         })
         if not quiet:
             print(f"纪事本末「{b['title']}」：{len(es)} 条，{es[0].when(True)} 至 {es[-1].when(True)}")
@@ -1409,7 +1494,7 @@ def build(quiet: bool = False) -> int:
             "name": z["name"], "summary": z["summary"],
             "span": [es[0].when(True), es[-1].when(True)] if es else None,
             "entries": [{"year": e.vol, "id": e.anchor} for e in es],
-            "others": [{"year": e.vol, "id": e.anchor} for e in others],
+            "others": [{"year": e.vol, "id": e.anchor} for e in others], "index": index_z.get(z["name"]),
         })
         if not quiet:
             print(f"列传「{z['name']}」：{len(es)} 条，其他出场 {len(others)} 条")
@@ -1572,16 +1657,20 @@ def raw_texts():
 
 
 def rawfind(pattern: str, limit: int = 60):
-    """在全部原始文本里搜。find 只查剧本库，写「剧本不载」之前要用这个查一遍。"""
+    """在全部原始文本里搜。find 只查剧本库，写「剧本不载」之前要用这个查一遍。
+    主线和干员密录排在前面，最容易漏的是它们。limit 为 0 时全部列出；被截断时会说明，判断「没有」之前要看全。"""
     rx = re.compile(pattern)
-    n = 0
-    for src, i, line in raw_texts():
-        for m in rx.finditer(line):
-            n += 1
-            if n <= limit:
-                print(f"{src}:{i}  " + " ".join(line[max(0, m.start() - 60):m.end() + 60].splitlines()))
-            break
-    print(f"共 {n} 处" + (f"，只列前 {limit} 处" if n > limit else ""))
+    hits = [(src, i, line, m) for src, i, line in raw_texts() if (m := rx.search(line))]
+    rank = lambda src: 0 if "main" in src else 1 if "memory" in src else 2
+    hits.sort(key=lambda h: rank(h[0]))  # 稳定排序，同类里保持原来的先后
+    shown = hits if not limit else hits[:limit]
+    for src, i, line, m in shown:
+        print(f"{src}:{i}  " + " ".join(line[max(0, m.start() - 60):m.end() + 60].splitlines()))
+    print(f"共 {len(hits)} 处")
+    if len(shown) < len(hits):
+        rest = Counter(h[0].split("/")[0] for h in hits[len(shown):])
+        print(f"！只列了前 {len(shown)} 处，其余 {len(hits) - len(shown)} 处在：{'、'.join(f'{k} {v}' for k, v in rest.most_common())}。"
+              f"判断「没有」之前，用 rawfind \"{pattern}\" 0 看全，或换更窄的词。")
 
 
 def verify_quotes(out_path: str | None = None):
@@ -1672,7 +1761,7 @@ def main(argv: list[str]) -> int:
     elif cmd == "find":
         find(rest[0], rest[1] if len(rest) > 1 else None)
     elif cmd == "rawfind":
-        rawfind(rest[0])
+        rawfind(rest[0], int(rest[1]) if len(rest) > 1 else 60)
     elif cmd == "check":
         return check(rest[0])
     elif cmd in ("build", "render"):
@@ -1685,6 +1774,8 @@ def main(argv: list[str]) -> int:
         long_groups(rest[0])
     elif cmd == "quotes":
         verify_quotes(rest[0] if rest else None)
+    elif cmd == "idx":
+        return check_index(rest[0])
     else:
         print(__doc__)
         return 2

@@ -5,6 +5,7 @@ r"""本地 OCR（GPU 版）：命令行、输出路径和文件格式都与 ocr_
     <gpu venv>/python pipeline/ocr_gpu.py book
     <gpu venv>/python pipeline/ocr_gpu.py video
     <gpu venv>/python pipeline/ocr_gpu.py comic 0694 3116
+    <gpu venv>/python pipeline/ocr_gpu.py records      《泰拉记事》，长图先切片
 
 与 ocr_tool.py 的区别：
   - 结果已存在就跳过（book 的全文.txt、video 的字幕/<片名>.txt、comic 的 ocr.txt）；加 --force 才重做。
@@ -280,11 +281,66 @@ def comic(cids, force=False, limit=0):
         print(folder.name, len(files), "页", flush=True)
 
 
+# ---------------------------------------------------------------- 泰拉记事
+
+
+def _tiles(path, folder):
+    """长图切片：引擎会把长边压到 2000，宽 1000、高 5000 的图字就糊了。
+    切片留在 <篇>/切片/，也给人看图用（整张长图读进来同样会被压小）。返回 [(切片路径, 核心区上沿, 核心区下沿)]，
+    核心区是这张切片负责的范围，相邻切片互相重叠，文字框中心落在核心区内才算，免得重复。"""
+    from PIL import Image
+    Image.MAX_IMAGE_PIXELS = None
+    image = Image.open(path).convert("RGB")
+    if image.width > 1200:
+        image = image.resize((1200, image.height * 1200 // image.width))
+    width, height = image.size
+    tile, overlap = int(width * 1.5), int(width * 0.15)
+    tops = list(range(0, max(height - overlap, 1), tile - overlap))
+    out = []
+    for k, top in enumerate(tops, 1):
+        bottom = min(top + tile, height)
+        target = folder / f"{path.stem}-{k:02d}.jpg"
+        image.crop((0, top, width, bottom)).save(target, quality=90)
+        out.append((target, 0 if k == 1 else overlap // 2, bottom - top if k == len(tops) else bottom - top - overlap // 2))
+    return out
+
+
+def _tile_ocr(tile):
+    path, core_top, core_bottom = tile
+    kept = [b for b in _ocr_boxes(path) if core_top <= (b[1] + b[3]) / 2 < core_bottom]
+    return [(text, score) for _, _, _, _, text, score in _vertical_order(kept)]
+
+
+def records(force=False, limit=0):
+    base = RAW / "泰拉记事"
+    whole = []
+    folders = sorted(p for p in base.iterdir() if p.is_dir())
+    for folder in folders[:limit or None]:
+        images = sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png", ".gif", ".webp"))
+        if not (folder / "ocr.txt").exists() or force:
+            tile_dir = folder / "切片"
+            tile_dir.mkdir(exist_ok=True)
+            out = []
+            for image in images:
+                tiles = _tiles(image, tile_dir)
+                with cf.ThreadPoolExecutor(max_workers=THREADS) as pool:
+                    results = list(pool.map(_tile_ocr, tiles))
+                for (tile, _, _), found in zip(tiles, results):
+                    out.append(f"### {tile.stem}")
+                    out += [("[?] " if score < 0.7 else "") + text for text, score in found if score >= 0.5]
+            (folder / "ocr.txt").write_text("\n".join(out) + "\n", encoding="utf-8")
+            print(folder.name, len(images), "图", flush=True)
+        whole.append(f"=== {folder.name} ===")
+        whole.append((folder / "ocr.txt").read_text(encoding="utf-8").rstrip())
+    (base / "全文.txt").write_text("\n".join(whole) + "\n", encoding="utf-8")
+    print("完成", base / "全文.txt", flush=True)
+
+
 def main():
     global RAW, THREADS
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("what", choices=["book", "video", "comic"])
+    parser.add_argument("what", choices=["book", "video", "comic", "records"])
     parser.add_argument("cids", nargs="*")
     parser.add_argument("--force", action="store_true", help="已有结果也重做")
     parser.add_argument("--raw", type=Path, default=RAW, help="Raw Data 的位置（试跑时指到别处）")
@@ -302,6 +358,8 @@ def main():
         book(args.force, args.limit)
     elif args.what == "video":
         video(args.force, args.limit)
+    elif args.what == "records":
+        records(args.force, args.limit)
     else:
         comic(args.cids, args.force, args.limit)
 

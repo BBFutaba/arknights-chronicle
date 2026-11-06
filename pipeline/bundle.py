@@ -18,7 +18,7 @@ import sys
 from .config import ROOT
 
 SITE = ROOT / "site"
-OUT = ROOT / "明日方舟编年史-完整版.html"
+OUT = ROOT / "刻舟录-完整版.html"
 
 IMPORT_NAMED = re.compile(r"^import\s+\{([^}]*)\}\s+from\s+'\./([\w.]+)';?[ \t]*$", re.M)
 IMPORT_STAR = re.compile(r"^import\s+\*\s+as\s+(\w+)\s+from\s+'\./([\w.]+)';?[ \t]*$", re.M)

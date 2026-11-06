@@ -160,8 +160,10 @@ function blocksHtml(items) {
 
 function anyQuote(q) {
   if (q.type === 'book') return bookQuote(q);
-  if (q.type === 'video' || q.type === 'comic') {
-    const where = q.type === 'video' ? `《${esc(q.title)}》${esc(q.time)}` : `《${esc(q.title)}》${esc(q.ep)} ${esc(q.page)}`;
+  if (q.type === 'video' || q.type === 'comic' || q.type === 'record') {
+    const where = q.type === 'video' ? `《${esc(q.title)}》${esc(q.time)}`
+      : q.type === 'record' ? `《泰拉记事·${esc(q.title)}》`
+      : `《${esc(q.title)}》${esc(q.ep)} ${esc(q.page)}`;
     return `<blockquote class="an-quote"><p class="ql">${esc(q.text)}</p>
       <cite class="bw-cite">——${q.who ? `${esc(q.who)} · ` : ''}${where}</cite></blockquote>`;
   }

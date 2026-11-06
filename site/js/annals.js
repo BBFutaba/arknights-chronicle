@@ -1,6 +1,5 @@
-// 编年史：左侧是卷目、月份和纪事本末，右侧按卷或按事连读。考异默认折叠。
-// 路由：#/annals/1097（一卷）、#/annals/1097?e=ev0536（跳到某条）、#/annals/1097?s=正月（跳到某月）、
-//      #/annals/本末/<事名>（纪事本末）、#/annals/传/<人物>（列传）、#/annals/凡例
+// 编年史：左侧是卷目和月份，右侧按卷连读。考异默认折叠。条目的渲染也给列传、纪事本末用。
+// 路由：#/annals/1097（一卷）、#/annals/1097?e=ev0536（跳到某条）、#/annals/1097?s=正月（跳到某月）、#/annals/凡例
 import { D } from './data.js';
 import { esc, href, charChip, charOf } from './util.js';
 
@@ -22,17 +21,15 @@ export function mount(el, r) {
 
 export function update(r) {
   if (!content) return;
-  const [a, b] = r.parts;
+  const [a] = r.parts;
   let vol = null;
-  if (a === '本末' && D.benmoByTitle[b]) renderBenmo(D.benmoByTitle[b]);
-  else if (a === '传' && D.zhuanByName[b]) renderZhuan(D.zhuanByName[b]);
-  else if (a === '凡例') renderFanli();
+  if (a === '凡例') renderFanli();
   else {
     vol = D.annals.volumes.find((v) => String(v.year) === a)
       ?? D.annals.volumes.find((v) => v.year === 1096) ?? D.annals.volumes[0];
     renderVolume(vol);
   }
-  renderSide(vol, a === '本末' ? b : a === '传' ? `传:${b}` : a === '凡例' ? '凡例' : null);
+  renderSide(vol, a === '凡例' ? '凡例' : null);
   jump(r.params, vol);
 }
 
@@ -56,16 +53,8 @@ function renderSide(vol, activeOther) {
     return `${head}<a class="list-item${active ? ' active' : ''}" href="${href.annals(v.year)}">
         <span class="grow">${esc(v.title.replace(/^泰拉历/, ''))}</span><span class="n">${v.stats.gang} 纲</span></a>${toc}`;
   }).join('');
-  const benmo = D.annals.benmo.map((b) => `
-    <a class="list-item${activeOther === b.title ? ' active' : ''}" href="${href.benmo(b.title)}">
-      <span class="grow">${esc(b.title)}</span><span class="n">${b.entries.length} 条</span></a>`).join('');
-  const zhuan = (D.annals.liezhuan ?? []).filter((z) => z.entries.length).map((z) => `
-    <a class="list-item${activeOther === `传:${z.name}` ? ' active' : ''}" href="${href.zhuan(z.name)}">
-      <span class="grow">${esc(z.name)}传</span><span class="n">${z.entries.length} 条</span></a>`).join('');
   side.innerHTML = `
     <div class="list-head">编年 · 按年</div>${vols}
-    ${benmo ? `<div class="list-head">纪事本末 · 按事</div>${benmo}` : ''}
-    ${zhuan ? `<div class="list-head">列传 · 按人</div>${zhuan}` : ''}
     <div class="list-head">说明</div>
     <a class="list-item${activeOther === '凡例' ? ' active' : ''}" href="#/annals/凡例"><span class="grow">凡例</span></a>`;
 }
@@ -82,10 +71,10 @@ function renderVolume(v) {
   const prev = D.annals.volumes[i - 1], next = D.annals.volumes[i + 1];
   const st = v.stats;
   content.innerHTML = `<div class="an-body">
-    <div class="sub">明日方舟编年史</div>
+    <div class="sub">刻舟录</div>
     <h1>${esc(v.title)}</h1>
     <div class="sub">${st.entries} 条年表事件 · ${st.gang} 组纲目 · ${st.quotes} 段原文 · 撰文 ${st.prose.toLocaleString()} 字，引文 ${st.quote_chars.toLocaleString()} 字 · <a href="#/annals/凡例">凡例</a></div>
-    ${controls()}
+    ${controlsHtml()}
     ${v.sections.map((s) => `
       <section class="an-sec" id="${secId(v.year, s.label)}">
         <h2>${esc(s.label)}</h2>
@@ -100,102 +89,64 @@ function renderVolume(v) {
       ${prev ? `<a class="btn" href="${href.annals(prev.year)}">← ${esc(prev.title)}</a>` : '<span></span>'}
       ${next ? `<a class="btn" href="${href.annals(next.year)}">${esc(next.title)} →</a>` : '<span></span>'}
     </div></div>`;
-  wireControls();
-}
-
-function renderBenmo(b) {
-  const key = `benmo:${b.title}`;
-  if (shown === key) return;
-  shown = key;
-  const entries = b.entries.map(({ id }) => D.annalsEntry[id]).filter(Boolean);
-  content.innerHTML = `<div class="an-body">
-    <div class="sub">纪事本末</div>
-    <h1>${esc(b.title)}</h1>
-    <div class="sub">${esc(b.span[0])}${b.span[1] !== b.span[0] ? ` 至 ${esc(b.span[1])}` : ''} · ${entries.length} 条</div>
-    ${b.summary.length ? `<div class="synopsis an-summary">${b.summary.map((p) => `<p>${inline(p)}</p>`).join('')}</div>` : ''}
-    <details class="an-index"><summary>按时间列出各条纲（${entries.reduce((n, e) => n + e.groups.length, 0)} 组）</summary>
-      <ol>${entries.map((e) => e.groups.map((g) => `
-        <li><a href="${href.benmo(b.title)}?e=${e.id}"><span class="when">${esc(e.when)}</span>${inline(g.gang)}</a></li>`).join('')).join('')}</ol>
-    </details>
-    ${controls()}
-    ${entries.map((e) => entryHtml(e, true)).join('')}
-  </div>`;
-  wireControls();
-}
-
-function renderZhuan(z) {
-  const key = `zhuan:${z.name}`;
-  if (shown === key) return;
-  shown = key;
-  const entries = z.entries.map(({ id }) => D.annalsEntry[id]).filter(Boolean);
-  const others = z.others.map(({ id }) => D.annalsEntry[id]).filter(Boolean);
-  content.innerHTML = `<div class="an-body">
-    <div class="sub">列传</div>
-    <h1>${esc(z.name)}传</h1>
-    <div class="sub">${z.span ? `${esc(z.span[0])}${z.span[1] !== z.span[0] ? ` 至 ${esc(z.span[1])}` : ''} · ` : ''}${entries.length} 条
-      · <a href="${href.char(z.name)}">人物页</a></div>
-    ${z.summary.length ? `<div class="synopsis an-summary">${z.summary.map((p) => `<p>${inline(p)}</p>`).join('')}</div>` : ''}
-    ${others.length ? `<details class="an-index"><summary>其他出场（${others.length} 条）</summary>
-      <ol>${others.map((e) => `<li><a href="${href.annals(e.year, e.id)}"><span class="when">${esc(e.when)}</span>${inline(e.groups[0].gang)}</a></li>`).join('')}</ol>
-    </details>` : ''}
-    ${controls()}
-    ${entries.map((e) => entryHtml(e, true)).join('')}
-  </div>`;
-  wireControls();
+  wireControls(content);
 }
 
 function renderFanli() {
   if (shown === 'fanli') return;
   shown = 'fanli';
   content.innerHTML = `<div class="an-body">
-    <div class="sub">明日方舟编年史</div>
+    <div class="sub">刻舟录</div>
     <h1>凡例</h1>
     <ul class="an-fanli">${D.annals.fanli.map((l) => `<li>${inline(l)}</li>`).join('')}</ul>
     <h4>各卷</h4>
     ${D.annals.volumes.map((v) => `<p><a class="btn" href="${href.annals(v.year)}">${esc(v.title)}</a>
       <span class="muted small">${v.stats.gang} 组纲目，${v.stats.quotes} 段原文</span></p>`).join('')}
-    ${D.annals.benmo.length ? `<h4>纪事本末</h4><div class="chips">${D.annals.benmo.map((b) => `<a class="chip chip-plain" href="${href.benmo(b.title)}">${esc(b.title)}</a>`).join('')}</div>` : ''}
   </div>`;
 }
 
-function controls() {
+export function controlsHtml() {
   return `<div class="an-controls">
     <label class="toggle"><input type="checkbox" data-ctl="gang"> 只看纲</label>
     <label class="toggle"><input type="checkbox" data-ctl="kaoyi"> 展开全部考异</label>
   </div>`;
 }
 
-function wireControls() {
-  content.querySelector('[data-ctl=gang]')?.addEventListener('change', (e) => {
-    content.classList.toggle('gang-only', e.target.checked);
+export function wireControls(el) {
+  el.querySelector('[data-ctl=gang]')?.addEventListener('change', (e) => {
+    el.classList.toggle('gang-only', e.target.checked);
   });
-  content.querySelector('[data-ctl=kaoyi]')?.addEventListener('change', (e) => {
-    content.querySelectorAll('details.an-kaoyi').forEach((d) => { d.open = e.target.checked; });
+  el.querySelector('[data-ctl=kaoyi]')?.addEventListener('change', (e) => {
+    el.querySelectorAll('details.an-kaoyi').forEach((d) => { d.open = e.target.checked; });
   });
-  content.classList.remove('gang-only');
+  el.classList.remove('gang-only');
 }
 
 const secId = (year, label) => `an-sec-${year}-${label}`;
 
 function jump(params, vol) {
-  const e = params.get('e'), s = params.get('s');
-  const el = e ? content.querySelector(`#an-${CSS.escape(e)}`)
-    : s && vol ? content.querySelector(`#${CSS.escape(secId(vol.year, s))}`) : null;
+  const s = params.get('s');
+  const el = !params.get('e') && s && vol ? content.querySelector(`#${CSS.escape(secId(vol.year, s))}`) : null;
+  if (el) el.scrollIntoView({ block: 'start' });
+  else jumpToEntry(content, params);
+}
+
+export function jumpToEntry(box, params) {
+  const e = params.get('e');
+  const el = e ? box.querySelector(`#an-${CSS.escape(e)}`) : null;
   if (!el) {
-    content.scrollTop = 0;
+    box.scrollTop = 0;
     return;
   }
   el.scrollIntoView({ block: 'start' });
-  if (e) {
-    el.classList.remove('flash');
-    void el.offsetWidth;  // 重新触发高亮动画
-    el.classList.add('flash');
-  }
+  el.classList.remove('flash');
+  void el.offsetWidth;  // 重新触发高亮动画
+  el.classList.add('flash');
 }
 
 // ---------------------------------------------------------------- 条目
 
-function entryHtml(e, withWhen = false) {
+export function entryHtml(e, withWhen = false) {
   const evLinks = e.ids.filter((i) => D.eventById[i])
     .map((i) => `<a href="${href.event(i)}">时间轴：${esc(D.eventById[i].when)}</a>`);
   const benmo = e.benmo.map((t) => `<a href="${href.benmo(t)}">纪事本末：${esc(t)}</a>`);
