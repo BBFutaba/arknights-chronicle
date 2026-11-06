@@ -3,7 +3,7 @@
 // 从主世界线分出、结束时合回。同一时期有几条故事线并行，就分出几条。
 // 一条故事线的两个事件之间隔得太远（超过 GAP 行）时会先合回再重新分出，避免一条线占满整列。
 import { D } from './data.js';
-import { esc, href, threadColor, threadChip, charChip, powerChip, epLabel, groupLabel, CAT_ORDER } from './util.js';
+import { esc, href, threadColor, threadChip, charChip, powerChip, epLabel, groupLabel, CAT_ORDER, pageHead } from './util.js';
 
 const ROW = 34;
 const GAP = 16;
@@ -32,7 +32,7 @@ export function mount(el, r) {
       <nav class="tl-eras"></nav>
       <p class="muted small">↑↓ 键切换事件。次序、日期和文字以本书编年史为准，PRTS 年表只作参考，见详情。</p>
     </aside>
-    <section class="tl-main"><div class="tl-scroll"><div class="tl-canvas"></div></div></section>
+    <section class="tl-main"><div class="tl-scroll"><div class="tl-head"></div><div class="tl-canvas"></div></div></section>
     <aside class="tl-detail panel"></aside>`;
   scroller = el.querySelector('.tl-scroll');
   canvas = el.querySelector('.tl-canvas');
@@ -53,7 +53,7 @@ export function mount(el, r) {
   });
   el.querySelector('.tl-eras').addEventListener('click', (e) => {
     const a = e.target.closest('[data-row]');
-    if (a) scroller.scrollTo({ top: Number(a.dataset.row) * ROW, behavior: 'smooth' });
+    if (a) scroller.scrollTo({ top: headHeight() + Number(a.dataset.row) * ROW, behavior: 'smooth' });
   });
   document.addEventListener('keydown', onKey);
   lastFilterKey = null;
@@ -124,6 +124,9 @@ function layout() {
   return { segs, lanes: laneEnd.length };
 }
 
+// 灰纸页头在滚动区里，行号换算成滚动位置时要加上它
+const headHeight = () => root.querySelector('.tl-head').offsetHeight;
+
 function render() {
   visible = D.events.filter(matches);
   items = [];
@@ -157,7 +160,8 @@ function render() {
     const lane = laneOfRow[r] ?? 0;
     const lore = it.ev.thread === 'lore';
     const main = D.threads[it.ev.thread]?.category === '主线';
-    return `<circle class="dot${lore ? ' lore' : ''}${main ? ' main' : ''}" data-ev="${it.ev.id}" cx="${x(lane)}" cy="${y(r)}" r="${main ? 4.8 : 4}" fill="${lore ? 'var(--panel)' : threadColor(it.ev.thread)}"/>`;
+    const s = main ? 4.5 : 3.5;  // 方块的半边长
+    return `<rect class="dot${lore ? ' lore' : ''}${main ? ' main' : ''}" data-ev="${it.ev.id}" x="${x(lane) - s}" y="${y(r) - s}" width="${s * 2}" height="${s * 2}" fill="${lore ? 'var(--panel)' : threadColor(it.ev.thread)}"/>`;
   }).join('');
 
   const rows = items.map((it) => {
@@ -203,6 +207,18 @@ function renderSide(lanes) {
   });
   root.querySelector('.tl-eras').innerHTML = eras.map((e) =>
     `<button data-row="${Math.max(e.row, 0)}">${esc(e.name)}<span class="muted">${e.n}</span></button>`).join('');
+
+  const title = state.char ? `人物：${state.char}`
+    : state.power ? `地区与势力：${D.powers[state.power]?.name ?? state.power}`
+      : state.thread ? `故事线：${D.threads[state.thread]?.name ?? state.thread}` : '全部事件';
+  root.querySelector('.tl-head').innerHTML = pageHead({
+    en: state.char || state.power || state.thread ? 'FILTERED' : 'ALL EVENTS',
+    title,
+    nums: [
+      ['显示', visible.length, '条', 'SHOWN'], ['全部', D.events.length, '条', 'TOTAL'],
+      ['并行', Math.max(lanes - 1, 0), '线', 'THREADS'], ['时代', eras.length, '段', 'ERAS'],
+    ],
+  });
 }
 
 // ------------------------------------------------------------------ 选中与详情
@@ -219,7 +235,7 @@ function select(id, scroll) {
   if (!ev) {
     selected = null;
     detail.innerHTML = `<div class="muted pad">点击左侧事件查看详情。<br><br>
-      颜色代表故事线（剧情组），灰色空心点是只有设定资料出处的事件。</div>`;
+      颜色代表故事线（剧情组），灰色空心方块是只有设定资料出处的事件。</div>`;
     return;
   }
   selected = ev.id;
@@ -230,7 +246,7 @@ function select(id, scroll) {
   }
   canvas.querySelectorAll(`[data-ev="${ev.id}"]`).forEach((n) => n.classList.add('sel'));
   if (scroll && rowOf[ev.id] != null) {
-    scroller.scrollTop = rowOf[ev.id] * ROW - scroller.clientHeight / 3;
+    scroller.scrollTop = headHeight() + rowOf[ev.id] * ROW - scroller.clientHeight / 3;
   }
   renderDetail(ev);
 }
@@ -257,7 +273,7 @@ function renderDetail(ev) {
     <div class="muted small">${esc(ev.era)}</div>
     <div class="ev-tags">${ev.thread === 'lore' ? '<span class="thread-chip" style="--c:var(--lore)">设定与档案</span>' : threadChip(ev.thread, 'group')}${ev.parallel ? '<span class="badge">平行世界</span>' : ''}</div>
     <div class="ev-lines">${ev.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div>
-    ${D.annalsByEvent[ev.id] ? `<div class="actions"><a class="btn" href="${href.annalsEntry(D.annalsByEvent[ev.id])}">📜 编年史中的记述</a></div>` : ''}
+    ${D.annalsByEvent[ev.id] ? `<div class="actions"><a class="btn" href="${href.annalsEntry(D.annalsByEvent[ev.id])}">编年史中的记述</a></div>` : ''}
     ${ev.notes.length ? `<div class="note">${ev.notes.map(esc).join('<br>')}</div>` : ''}
     ${ev.chars.length || ev.powers.length ? `<h4>涉及</h4><div class="chips">${ev.chars.map((n) => charChip(n)).join('')}${ev.powers.map((p) => powerChip(p)).join('')}</div>` : ''}
     ${filters ? `<h4>在时间轴中只看</h4><div class="filter-links">${filters}</div>` : ''}

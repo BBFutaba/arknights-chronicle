@@ -1,6 +1,6 @@
 // 纪事本末：按事。索引写在 data/annals/本末索引.md，时期和条数由程序算。
 import { D } from './data.js';
-import { esc, href, charChip } from './util.js';
+import { esc, href, charChip, pageHead } from './util.js';
 import { inline, entryHtml, controlsHtml, wireControls, jumpToEntry } from './annals.js';
 import { makeShelf, OPTION_NONE, volumeOrder, cnYear } from './shelf.js';
 
@@ -55,17 +55,15 @@ function items() {
 function detail(item, el, links) {
   const { b, ix, entries, people } = item;
   const chip = (facet, value) => `<a class="shelf-chip" href="${esc(links.filter(facet, value))}">${esc(facet)}：${esc(value)}</a>`;
-  el.innerHTML = `<div class="an-body">
-    <a class="shelf-back" href="${esc(links.back)}">← 纪事本末索引</a>
-    <div class="sub">纪事本末</div>
-    <h1>${esc(b.title)}</h1>
-    <div class="sub">${esc(b.span[0])}${b.span[1] !== b.span[0] ? ` 至 ${esc(b.span[1])}` : ''} · ${entries.length} 条</div>
-    <div class="shelf-meta">
-      ${ix.regions.map((r) => chip('地区', r)).join('')}
-      ${ix.kind ? chip('性质', ix.kind) : ''}
-      ${ix.end ? chip('了局', ix.end) : ''}
-    </div>
-    ${ix.note ? `<div class="shelf-fate">${esc(ix.note)}</div>` : ''}
+  el.innerHTML = `${pageHead({
+    en: 'TOPIC, START TO END',
+    title: b.title,
+    back: [links.back, '← 纪事本末索引'],
+    sub: `${esc(b.span[0])}${b.span[1] !== b.span[0] ? ` 至 ${esc(b.span[1])}` : ''}`,
+    tags: [...ix.regions.map((r) => chip('地区', r)), ix.kind ? chip('性质', ix.kind) : '', ix.end ? chip('了局', ix.end) : ''].join(''),
+    note: ix.note ? esc(ix.note) : '',
+    nums: [['条目', entries.length, '条', 'ENTRIES'], people.length ? ['人物', people.length, '人', 'PEOPLE'] : null],
+  })}<div class="an-body">
     ${b.summary.length ? `<div class="synopsis an-summary">${b.summary.map((p) => `<p>${inline(p)}</p>`).join('')}</div>` : ''}
     ${people.length ? `<details class="an-index"><summary>主要人物（${people.length} 人）</summary><div class="chips">${people.map((n) => charChip(n)).join('')}</div></details>` : ''}
     <details class="an-index"><summary>按时间列出各条纲（${entries.reduce((n, e) => n + e.groups.length, 0)} 组）</summary>
@@ -80,6 +78,7 @@ function detail(item, el, links) {
 
 const shelf = makeShelf({
   route: 'benmo', title: '纪事本末', unit: '件', placeholder: '搜事名、人名、地名……',
+  headNums: { facet: '了局', order: ENDS, unit: '事', unitEn: 'EVENTS' },
   intro: '<b>时期</b>看这件事条目最多的那一年。<b>了局</b>：已了是有明确结局，未了是到书末余波还在，悬案是结果或真相不明。左栏可以多选，同一项里是「或」，不同项之间是「且」。',
   facets: [
     { key: '时期', order: PERIODS, open: true },

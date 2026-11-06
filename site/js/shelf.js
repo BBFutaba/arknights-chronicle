@@ -5,7 +5,7 @@
 //      facets：[{ key, order?（固定顺序）, open? }]；groups：可选的分组；sorts：[排序名]，第一个是默认
 //      resolve(key)：地址里的名字 → item；detail(item, el, params)：渲染单篇
 import { D } from './data.js';
-import { esc } from './util.js';
+import { esc, pageHead } from './util.js';
 
 export const OPTION_NONE = '不分组';
 const OPTION_GROUP = '分组', OPTION_SORT = '排序', OPTION_Q = 'q';
@@ -113,10 +113,15 @@ export function makeShelf(cfg) {
     const facet = cfg.facets.find((f) => f.key === state.group);
     const heads = facet?.order ? facet.order.filter((v) => groups.has(v)).concat([...groups.keys()].filter((v) => !facet.order.includes(v)))
       : [...groups.keys()].sort((a, b) => groups.get(b).length - groups.get(a).length || collator.compare(a, b));
-    content.innerHTML = `<div class="an-body shelf-index">
-      <div class="sub">刻舟录</div>
-      <h1>${esc(cfg.title)}</h1>
-      <div class="sub">${cfg.intro}</div>
+    // 页头的数字跟着筛选走：当前筛出来的条目，按一个分面数
+    const hn = cfg.headNums;
+    const tally = (v) => list.filter((it) => it.facets[hn.facet]?.includes(v)).length;
+    content.innerHTML = `${pageHead({
+      en: 'INDEX',
+      title: cfg.title,
+      note: cfg.intro,
+      nums: hn.order.map((v) => [hn.label?.(v) ?? v, tally(v), hn.unit, hn.unitEn]),
+    })}<div class="an-body shelf-index">
       <div class="shelf-groups">${heads.map((k) => `<section>
         ${k ? `<h2 class="shelf-head">${esc(facet?.label?.(k) ?? k)}<span class="n">${groups.get(k).length}</span></h2>` : ''}
         ${groups.get(k).map(rowHtml).join('')}

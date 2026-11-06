@@ -1,6 +1,8 @@
 // 剧情：左侧剧情组目录，右侧是剧情组概览或分集阅读。
 import { D, loadStory } from './data.js';
-import { esc, href, epLabel, groupLabel, charChip, charOf, powerChip, eventItem, threadColor } from './util.js';
+import { esc, href, epLabel, groupLabel, charChip, charOf, powerChip, eventItem, threadColor, pageHead } from './util.js';
+
+const CAT_EN = { 主线: 'MAIN STORY', 活动: 'EVENT', 故事集: 'COLLECTION', 干员密录: 'OPERATOR RECORD', 集成战略: 'INTEGRATED STRATEGIES', 生息演算: 'RECLAMATION ALGORITHM', 其他文本: 'OTHER TEXT' };
 
 let root, side, content, cat = '主线', filter = '', renderToken = 0;
 
@@ -58,9 +60,15 @@ function renderGroup(g) {
   const powers = {};
   for (const e of g.episodes) for (const [p, c] of e.powers) powers[p] = (powers[p] ?? 0) + c;
   const evs = g.events.map((id) => D.eventById[id]);
-  content.innerHTML = `
-    <h1>${esc(g.name)}</h1>
-    <div class="sub">${esc(g.category)} · ${g.chapter != null ? esc(g.label) : (g.date ? `${esc(g.date)} 开放` : '不限时')} · 共 ${g.episodes.length} 集</div>
+  content.innerHTML = `${pageHead({
+    en: CAT_EN[g.category] ?? 'STORY',
+    title: g.name,
+    sub: `${esc(g.category)} · ${g.chapter != null ? esc(g.label) : (g.date ? `${esc(g.date)} 开放` : '不限时')}`,
+    nums: [
+      ['分集', g.episodes.length, '集', 'EPISODES'], ['出场', chars.length, '人', 'PEOPLE'],
+      evs.length ? ['事件', evs.length, '条', 'EVENTS'] : null,
+    ],
+  })}
     <div class="actions">
       <a class="btn" href="${href.ep(g.episodes[0].id)}">从第一集开始读</a>
       ${evs.length ? `<a class="btn" href="${href.timeline({ thread: g.id })}">在时间轴中查看（${evs.length} 条事件）</a>` : ''}
@@ -93,13 +101,19 @@ async function renderEpisode(sid, hl = new Set()) {
       ${prev ? `<a class="btn" href="${href.ep(prev.id)}">← ${esc(epLabel(prev))}</a>` : '<span></span>'}
       ${next ? `<a class="btn" href="${href.ep(next.id)}">${esc(epLabel(next))} →</a>` : `<a class="btn" href="${href.group(g.id)}">返回目录</a>`}</div>`;
   const evs = ep.events.map((id) => D.eventById[id]);
-  content.innerHTML = `
-    <div class="sub"><a href="${href.group(g.id)}">${esc(groupLabel(g))}</a> · 第 ${index + 1} / ${g.episodes.length} 集</div>
-    <h1>${esc(epLabel(ep))}</h1>
+  content.innerHTML = `${pageHead({
+    en: CAT_EN[g.category] ?? 'STORY',
+    title: epLabel(ep),
+    back: [href.group(g.id), `← ${groupLabel(g)}`],
+    nums: [
+      ['分集', index + 1, `/ ${g.episodes.length}`, 'EPISODE'], ['出场', ep.chars.length, '人', 'PEOPLE'],
+      evs.length ? ['事件', evs.length, '条', 'EVENTS'] : null,
+    ],
+  })}
     ${ep.synopsis ? `<div class="synopsis">${esc(ep.synopsis)}</div>` : ''}
     <div class="chips">${ep.chars.map(([n, l]) => charChip(n, l ? `<span class="n">${l}</span>` : '')).join('')}</div>
     ${ep.others.length ? `<div class="small muted" style="margin-top:6px">其他说话人：${ep.others.map(([n, c]) => `${esc(n)} ${c}`).join(' · ')}</div>` : ''}
-    ${ep.stamps.length ? `<div class="small" style="margin-top:6px">📍 ${ep.stamps.map((s) => esc(s.filter(Boolean).join(' · '))).join('；')}</div>` : ''}
+    ${ep.stamps.length ? `<div class="small ep-stamps">${ep.stamps.map((s) => esc(s.filter(Boolean).join(' · '))).join('；')}</div>` : ''}
     ${evs.length ? `<h4>相关事件</h4>${evs.map(eventItem).join('')}` : ''}
     ${nav}
     <div class="script muted">正在加载剧本…</div>
@@ -128,6 +142,6 @@ function renderLine([k, sp, t]) {
   if (k === 'n') return `<div class="ln n">${esc(t)}</div>`;
   if (k === 'c') return `<div class="ln c"><span class="small muted">博士的选项</span>${t.map((o) => `<span class="opt">▸ ${esc(o)}</span>`).join('')}</div>`;
   if (k === 'b') return `<div class="ln b">〔选项 ${esc(t)} 的分支〕</div>`;
-  if (k === 's') return `<div class="ln s">📍 ${esc(t)}</div>`;
+  if (k === 's') return `<div class="ln s">${esc(t)}</div>`;
   return '';
 }

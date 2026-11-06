@@ -1,6 +1,8 @@
 // 人物：左侧可筛选的人物列表，右侧人物卡片（档案、出场、相关事件、常同场人物）。
 import { D } from './data.js';
-import { esc, href, KIND_LABEL, charChip, powerChip, eventItem, groupLabel } from './util.js';
+import { esc, href, KIND_LABEL, charChip, powerChip, eventItem, groupLabel, pageHead } from './util.js';
+
+const KIND_EN = { operator: 'OPERATOR', npc: 'NPC', doctor: 'DOCTOR' };
 
 const LIST_LIMIT = 600;
 let side, content, kind = 'all', sort = 'appear', q = '', power = '';
@@ -81,18 +83,23 @@ function renderProfile(name) {
   const evs = c.events.map((id) => D.eventById[id]);
   const basic = prof?.basic ? Object.entries(prof.basic) : [];
   const stars = c.rarity ? '★'.repeat(c.rarity) : '';
-  content.innerHTML = `
-    <div class="profile-head">
-      <h1>${esc(name)}</h1>
-      ${c.appellation ? `<span class="muted">${esc(c.appellation)}</span>` : ''}
-      <span class="tags"><span class="chip chip-${c.kind}">${KIND_LABEL[c.kind]}</span>
-        ${c.profession ? `<span class="chip chip-plain">${esc(c.profession)} ${stars}</span>` : ''}</span>
-    </div>
-    ${c.aliases.length ? `<div class="sub">又名：${c.aliases.map(esc).join('、')}</div>` : ''}
+  const written = D.annalsByPerson[name]?.length ?? 0;
+  content.innerHTML = `${pageHead({
+    en: c.appellation || KIND_EN[c.kind],
+    title: name,
+    sub: c.aliases.length ? `又名：${c.aliases.map(esc).join('、')}` : '',
+    tags: `<span class="chip chip-${c.kind}">${KIND_LABEL[c.kind]}</span>
+      ${c.profession ? `<span class="chip chip-plain">${esc(c.profession)} ${stars}</span>` : ''}`,
+    nums: [
+      ['出场', epCount(c), '集', 'EPISODES'], ['台词', c.lines, '句', 'LINES'],
+      evs.length ? ['事件', evs.length, '条', 'EVENTS'] : null,
+      written ? ['书中记述', written, '条', 'ANNALS'] : null,
+    ],
+  })}
     <div class="actions">
       ${evs.length ? `<a class="btn" href="${href.timeline({ char: name })}">在时间轴中查看（${evs.length} 条事件）</a>` : ''}
       <a class="btn" href="${href.graph('char', name)}">在关系图中查看</a>
-      ${D.zhuanByName[name]?.entries.length ? `<a class="btn" href="${href.zhuan(name)}">📜 ${esc(name)}传</a>` : ''}
+      ${D.zhuanByName[name]?.entries.length ? `<a class="btn" href="${href.zhuan(name)}">${esc(name)}传</a>` : ''}
     </div>
     ${c.powers.length ? `<h4>所属</h4><div class="chips">${c.powers.map((p) => powerChip(p)).join('')}</div>` : ''}
     ${c.description ? `<h4>敌人图鉴</h4><p>${esc(c.description)}</p>` : ''}

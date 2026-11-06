@@ -1,7 +1,7 @@
 // 编年史：左侧是卷目和月份，右侧按卷连读。考异默认折叠。条目的渲染也给列传、纪事本末用。
 // 路由：#/annals/1097（一卷）、#/annals/1097?e=ev0536（跳到某条）、#/annals/1097?s=正月（跳到某月）
 import { D } from './data.js';
-import { esc, href, charChip, charOf } from './util.js';
+import { esc, href, charChip, charOf, pageHead } from './util.js';
 
 let side, content, shown = null;
 
@@ -64,17 +64,21 @@ function renderVolume(v) {
   const i = D.annals.volumes.indexOf(v);
   const prev = D.annals.volumes[i - 1], next = D.annals.volumes[i + 1];
   const st = v.stats;
-  content.innerHTML = `<div class="an-body">
-    <div class="sub">刻舟录</div>
-    <h1>${esc(v.title)}</h1>
-    <div class="sub">${st.entries} 条 · ${st.gang} 组纲目 · ${st.quotes} 段原文 · 撰文 ${st.prose.toLocaleString()} 字，引文 ${st.quote_chars.toLocaleString()} 字</div>
+  content.innerHTML = `${pageHead({
+    en: `VOLUME ${String(i + 1).padStart(2, '0')}/${D.annals.volumes.length}`,
+    title: v.title,
+    nums: [
+      ['条目', st.entries, '条', 'ENTRIES'], ['纲目', st.gang, '组', 'HEADINGS'], ['原文', st.quotes, '段', 'QUOTES'],
+      ['撰文', st.prose, '字', 'WRITTEN'], ['引文', st.quote_chars, '字', 'CITED'],
+    ],
+  })}<div class="an-body">
     ${controlsHtml()}
     ${v.sections.map((s) => `
       <section class="an-sec" id="${secId(v.year, s.label)}">
-        <h2>${esc(s.label)}</h2>
+        <h2><span>${esc(s.label)}</span></h2>
         ${s.days.map((d) => `${d.label ? `<h3 class="an-day">${esc(d.label)}</h3>` : ''}${d.entries.map((e) => entryHtml(e)).join('')}`).join('')}
       </section>`).join('')}
-    ${v.cunmu?.length ? `<section class="an-sec an-cunmu" id="${secId(v.year, '存目')}"><h2>存目</h2>
+    ${v.cunmu?.length ? `<section class="an-sec an-cunmu" id="${secId(v.year, '存目')}"><h2><span>存目</span></h2>
       <p class="muted small">以下年表事件于人于事没有推力，不入正文，只存其目。</p>
       <ol>${v.cunmu.map((c) => `<li id="an-${c.id}"><span class="when">${esc(c.prts)}</span>${inline(c.gang)}
         ${c.kaoyi.length ? `<div class="small muted">${c.kaoyi.map((k) => inline(k.text)).join(' ')}</div>` : ''}</li>`).join('')}</ol>
@@ -183,7 +187,7 @@ function quoteLine([k, sp, t]) {
   if (k === 'd') return `<div class="ql d">${sp ? `<span class="sp">${esc(sp)}</span>` : ''}<span>${esc(t)}</span></div>`;
   if (k === 'n') return `<div class="ql n">${esc(t)}</div>`;
   if (k === 'c') return `<div class="ql d c"><span class="sp">${esc(sp)}（选项）</span><span>${esc(t)}</span></div>`;
-  if (k === 's') return `<div class="ql s">📍 ${esc(t)}</div>`;
+  if (k === 's') return `<div class="ql s">${esc(t)}</div>`;
   return '';
 }
 

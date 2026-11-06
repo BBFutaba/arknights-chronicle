@@ -9,7 +9,6 @@
 <body>
   <header class="topbar">
     <a class="brand" href="#/timeline">刻舟录</a>
-    <span class="credit">明日方舟编年史 · 双叶 撰</span>
     <nav class="tabs" id="tabs">
       <a href="#/timeline" data-view="timeline">时间轴</a>
       <a href="#/annals" data-view="annals">编年史</a>
@@ -26,8 +25,12 @@
       <div class="search-results" hidden></div>
     </div>
     <button class="about-btn" id="about-btn" title="关于数据来源">关于</button>
+    <div class="track" id="track" aria-hidden="true"></div>
   </header>
   <main id="view"><div class="loading">正在加载数据…</div></main>
+  <footer class="capbar">
+    同人整理，非官方 · 明日方舟编年史 · 双叶 撰 · <a href="https://github.com/BBFutaba/arknights-chronicle" target="_blank" rel="noopener">GitHub 仓库</a> · <a href="https://github.com/BBFutaba/arknights-chronicle/issues" target="_blank" rel="noopener">提 issue</a>
+  </footer>
   <dialog id="about"></dialog>
   <script src="vendor/force-graph.min.js"></script>
   <script type="module" src="js/main.js"></script>

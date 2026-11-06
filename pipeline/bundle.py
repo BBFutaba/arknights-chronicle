@@ -87,7 +87,10 @@ def main() -> int:
         return 1
     html = (src / "index.html").read_text(encoding="utf-8")
     css = (src / "style.css").read_text(encoding="utf-8")
-    vendor = (src / "vendor" / "force-graph.min.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
+    # 单文件版不能再去取外部文件，字体写进 CSS
+    css = re.sub(r"url\(fonts/([^)]+)\)", lambda m: "url(data:font/woff2;base64,"
+                 + base64.b64encode((src / "fonts" / m.group(1)).read_bytes()).decode("ascii") + ")", css)
+    vendor =(src / "vendor" / "force-graph.min.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
     vendor = f"/*\n{(src / 'vendor' / 'force-graph.LICENSE').read_text(encoding='utf-8')}*/\n{vendor}"
     js = bundle_js(src).replace("</script", "<\\/script")
     blobs, raw = [], 0

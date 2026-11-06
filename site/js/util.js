@@ -74,6 +74,31 @@ export function eventItem(ev) {
     <span class="text">${esc(ev.lines[0] ?? '')}${more}</span></a>`;
 }
 
+// 页头：压在内容区顶上的一条灰纸，和左栏标题块同一个语法，轨道接着左栏的走。
+// nums 是 [标签, 数字, 单位, 英文单位] 的数组，空值跳过；aside 放在右边，代替数字列。
+export function pageHead({ en = '', title, back = null, sub = '', tags = '', note = '', nums = [], aside = '' }) {
+  const fmt = (v) => (typeof v === 'number' ? v.toLocaleString('en-US') : esc(v));
+  const cols = nums.filter(Boolean).map(([label, v, unit, unitEn]) => `<div class="ph-num">
+      <span class="ph-num-l">${esc(label)}</span>
+      <div class="ph-num-v"><b>${fmt(v)}</b><span><i>${esc(unit)}</i><em>${esc(unitEn)}</em></span></div>
+    </div>`).join('');
+  return `<header class="ph">
+    <div class="ph-body">
+      <div class="ph-main">
+        <i class="ph-stem"></i><i class="ph-cap"></i>
+        ${back ? `<a class="ph-back" href="${esc(back[0])}">${esc(back[1])}</a>` : ''}
+        ${en ? `<div class="ph-en">${esc(en)}</div>` : ''}
+        <h1>${esc(title)}</h1>
+        ${sub ? `<div class="ph-sub">${sub}</div>` : ''}
+        ${tags ? `<div class="ph-tags">${tags}</div>` : ''}
+        ${note ? `<div class="ph-note">${note}</div>` : ''}
+      </div>
+      ${aside || (cols ? `<div class="ph-nums">${cols}</div>` : '')}
+    </div>
+    <div class="ph-track"></div>
+  </header>`;
+}
+
 export function h(html) {
   const t = document.createElement('template');
   t.innerHTML = html.trim();

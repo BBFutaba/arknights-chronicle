@@ -3,6 +3,7 @@
 import { D, loadAll } from './data.js';
 import { esc, href } from './util.js';
 import { initSearch } from './search.js';
+import { initStage, setStation } from './station.js';
 import * as timeline from './timeline.js';
 import * as story from './story.js';
 import * as chars from './chars.js';
@@ -51,15 +52,17 @@ function route() {
   }
   document.querySelectorAll('#tabs a').forEach((a) => a.classList.toggle('active', a.dataset.view === r.name));
   const mod = VIEWS[r.name];
-  if (current === r.name && mod.update) {
-    mod.update(r);
-  } else {
+  const fresh = !(current === r.name && mod.update);
+  if (fresh) {
     if (current) VIEWS[current].unmount?.();
     view.innerHTML = '';
     view.className = `view-${r.name}`;
     mod.mount(view, r);
     current = r.name;
+  } else {
+    mod.update(r);
   }
+  setStation(r.name, view, fresh);
 }
 
 function initAbout() {
@@ -79,6 +82,7 @@ try {
   await loadAll();
   initSearch();
   initAbout();
+  initStage();
   window.addEventListener('hashchange', route);
   route();
 } catch (err) {

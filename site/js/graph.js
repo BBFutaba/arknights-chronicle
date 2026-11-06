@@ -24,7 +24,8 @@ let hover = null, selected = null, lastClick = { id: null, t: 0 };
 let palette = {}, fadeTimer = null, fitTimer = null, fitPending = false;
 
 const epCount = (c) => c.appear.reduce((n, [, sids]) => n + sids.length, 0);
-const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+// 颜色从关系图自己的平面上读：纸面和深色平面是两组值
+const css = (v) => getComputedStyle(document.querySelector('.graph-main') ?? document.documentElement).getPropertyValue(v).trim();
 const nid = (x) => (typeof x === 'object' ? x.id : x);
 const clamp = (x) => Math.max(0, Math.min(1, x));
 
@@ -44,9 +45,10 @@ export function mount(el, r) {
       </details>
       <div class="actions"><button class="btn g-relayout">重新布局</button><button class="btn g-fit">适应窗口</button></div>
       <div class="legend">
-        <span><i style="background:var(--c-operator)"></i>干员</span><span><i style="background:var(--c-npc)"></i>NPC</span>
-        <span><i style="background:var(--c-region)"></i>地区</span><span><i style="background:var(--c-faction)"></i>势力</span>
-        <span><i style="background:var(--lore)"></i>事件</span>
+        <span><i class="lg lg-operator"></i>干员</span><span><i class="lg lg-npc"></i>NPC</span>
+        <span><i class="lg lg-doctor"></i>博士</span>
+        <span><i class="lg lg-region"></i>地区</span><span><i class="lg lg-faction"></i>势力</span>
+        <span><i class="lg lg-event"></i>事件</span>
       </div>
       <p class="muted small">连线越粗，共同出场的集数越多。拖动节点，相连的人物会跟着移动。悬停或点击节点只看它的关联，双击以它为中心。</p>
     </aside>
@@ -170,9 +172,8 @@ function collect() {
 function build() {
   if (!fg) return;
   palette = {
-    operator: css('--c-operator'), npc: css('--c-npc'), doctor: css('--c-doctor'),
-    region: css('--c-region'), faction: css('--c-faction'), event: css('--lore'),
-    text: css('--text'), panel: css('--panel'), muted: css('--muted'), accent: css('--accent'),
+    paper: css('--paper'), ink: css('--ink'), lime: css('--lime'), hair: css('--hair'),
+    text: css('--text'), panel: css('--panel'),
   };
   const { nodes: specs, links: linkSpecs } = collect();
 
@@ -195,7 +196,6 @@ function build() {
     const fresh = !n || !current.has(n);
     if (!n) cache.set(id, n = { id });
     Object.assign(n, spec, {
-      color: palette[spec.type] ?? palette.muted,
       r: Math.max(4, Math.min(22, 2.5 + Math.sqrt(spec.size) * 1.7)),
     });
     n.fade ??= 1;
@@ -254,13 +254,13 @@ function initGraph() {
     .nodeLabel(() => '')
     .nodeCanvasObject(drawNode)
     .nodePointerAreaPaint((n, color, ctx) => {
+      // 标签比方块宽，点标签上任何地方都要算点中
+      const hw = n.hitW ?? n.r + 2, hh = n.hitH ?? n.r + 2;
       ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.r + 2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(n.x - hw, n.y - hh, hw * 2, hh * 2);
     })
     .linkColor(linkColor)
-    .linkWidth((l) => (l.kind === 'co' ? 0.4 + l.norm * 2.6 : 0.7) + (isHot(l) ? 0.6 : 0))
+    .linkWidth((l) => (l.kind === 'co' ? 0.35 + l.norm * 2.2 : 0.6) + (isHot(l) ? 0.5 : 0))
     .linkLineDash((l) => (l.kind === 'member' || l.kind === 'parent' ? [3, 3] : null))
     .d3AlphaDecay(0.02)
     .d3VelocityDecay(0.35)
@@ -325,43 +325,118 @@ function setFades() {
   fadeTimer = setTimeout(() => fg?.autoPauseRedraw(true), 700);
 }
 
+// 素材和介绍片一个语法：十字方块是人物，黑底标签是地区和势力，发丝线是连线，只有高亮用荧光绿。
+const FONT = '"Inter Tight", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+
 function drawNode(n, ctx, scale) {
   n.fade += ((n.target ?? 1) - n.fade) * 0.2;
-  const r = n.r;
+  const hot = n === active() || (n === selected && n.emph);
   ctx.globalAlpha = n.fade;
-  ctx.fillStyle = n.color;
-  ctx.beginPath();
-  if (n.type === 'region' || n.type === 'faction') ctx.roundRect(n.x - r, n.y - r, r * 2, r * 2, r * 0.35);
-  else if (n.type === 'event') {
-    ctx.moveTo(n.x, n.y - r); ctx.lineTo(n.x + r, n.y); ctx.lineTo(n.x, n.y + r); ctx.lineTo(n.x - r, n.y); ctx.closePath();
-  } else ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-  ctx.fill();
-  if (n === active() || (n === selected && n.emph)) {
-    ctx.lineWidth = 2.5 / scale;
-    ctx.strokeStyle = palette.accent;
-    ctx.stroke();
-  }
-  // 标签：节点在屏幕上半径 7px 时开始浮现，13px 时完全显示；高亮的节点始终显示
-  const show = Math.max(clamp((scale * r - 7) / 6), n.emph ? 1 : 0) * n.fade;
-  if (show > 0.03) {
-    const fs = 12 / scale;
-    ctx.globalAlpha = show;
-    ctx.font = `${n.type === 'region' || n.type === 'faction' ? 600 : 400} ${fs}px system-ui, "Microsoft YaHei", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.lineWidth = 3 / scale;
-    ctx.strokeStyle = palette.panel;
-    ctx.strokeText(n.label, n.x, n.y + r + 2 / scale);
-    ctx.fillStyle = palette.text;
-    ctx.fillText(n.label, n.x, n.y + r + 2 / scale);
+  if (n.type === 'region' || n.type === 'faction') {
+    drawPower(n, ctx, scale, hot);
+  } else {
+    if (n.type === 'event') drawEvent(n, ctx, scale, hot);
+    else drawCross(n, ctx, scale, hot);
+    drawLabel(n, ctx, scale, hot);
   }
   ctx.globalAlpha = 1;
 }
 
+// 人物：十字方块。干员实心，NPC 空心，博士黑底绿线，当前选中的整块荧光绿
+function drawCross(n, ctx, scale, hot) {
+  const { paper, ink, lime, hair, panel } = palette;
+  const [fill, edge, mark] = hot ? [lime, ink, ink]
+    : n.type === 'operator' ? [paper, ink, ink]
+      : n.type === 'doctor' ? [ink, lime, lime]
+        : [panel, hair, hair];
+  const s = n.r * 0.88;  // 方块比同半径的圆显大，收一点
+  ctx.fillStyle = fill;
+  ctx.fillRect(n.x - s, n.y - s, s * 2, s * 2);
+  ctx.lineWidth = 1 / scale;
+  ctx.strokeStyle = edge;
+  ctx.strokeRect(n.x - s, n.y - s, s * 2, s * 2);
+  if (s * scale < 4) return;  // 屏幕上太小就不画十字了
+  const c = s * 0.56;
+  ctx.lineWidth = Math.max(1 / scale, s * 0.09);
+  ctx.strokeStyle = mark;
+  ctx.beginPath();
+  ctx.moveTo(n.x - c, n.y); ctx.lineTo(n.x + c, n.y);
+  ctx.moveTo(n.x, n.y - c); ctx.lineTo(n.x, n.y + c);
+  ctx.stroke();
+}
+
+function drawEvent(n, ctx, scale, hot) {
+  const r = n.r * 0.8;
+  ctx.fillStyle = hot ? palette.lime : palette.panel;
+  ctx.beginPath();
+  ctx.moveTo(n.x, n.y - r); ctx.lineTo(n.x + r, n.y); ctx.lineTo(n.x, n.y + r); ctx.lineTo(n.x - r, n.y); ctx.closePath();
+  ctx.fill();
+  ctx.lineWidth = 1 / scale;
+  ctx.strokeStyle = hot ? palette.ink : palette.hair;
+  ctx.stroke();
+}
+
+// 地区和势力：黑底标签，字就写在标签里。缩得太小时退成一个小黑块，放大了再出字
+function drawPower(n, ctx, scale, hot) {
+  const { ink, lime, paper, hair } = palette;
+  const faction = n.type === 'faction';
+  const edge = hot ? ink : faction ? lime : hair;
+  if (!n.emph && scale * n.r < 6) {
+    const s = n.r * 0.88;
+    ctx.fillStyle = hot ? lime : ink;
+    ctx.fillRect(n.x - s, n.y - s, s * 2, s * 2);
+    ctx.lineWidth = 1 / scale;
+    ctx.strokeStyle = edge;
+    ctx.strokeRect(n.x - s, n.y - s, s * 2, s * 2);
+    n.hitW = n.hitH = s + 2 / scale;
+    return;
+  }
+  const fs = 12 / scale;
+  ctx.font = `700 ${fs}px ${FONT}`;
+  const w = ctx.measureText(n.label).width + 14 / scale, h = fs + 9 / scale;
+  ctx.fillStyle = hot ? lime : ink;
+  ctx.fillRect(n.x - w / 2, n.y - h / 2, w, h);
+  ctx.lineWidth = 1 / scale;
+  ctx.strokeStyle = edge;
+  ctx.strokeRect(n.x - w / 2, n.y - h / 2, w, h);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = hot ? ink : faction ? lime : paper;
+  ctx.fillText(n.label, n.x, n.y + 0.5 / scale);
+  n.hitW = w / 2;
+  n.hitH = h / 2;
+}
+
+// 人名：节点在屏幕上半径 7px 时开始浮现，13px 时完全显示；高亮的节点始终显示，并换成黑底标签
+function drawLabel(n, ctx, scale, hot) {
+  const show = Math.max(clamp((scale * n.r - 7) / 6), n.emph ? 1 : 0) * n.fade;
+  if (show <= 0.03) return;
+  const fs = 12 / scale;
+  const top = n.y + n.r + 3 / scale;
+  ctx.globalAlpha = show;
+  ctx.font = `${n.emph ? 700 : 500} ${fs}px ${FONT}`;
+  ctx.textAlign = 'center';
+  if (n.emph) {
+    const w = ctx.measureText(n.label).width + 10 / scale, h = fs + 6 / scale;
+    ctx.fillStyle = hot ? palette.lime : palette.ink;
+    ctx.fillRect(n.x - w / 2, top, w, h);
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = hot ? palette.ink : '#fff';
+    ctx.fillText(n.label, n.x, top + h / 2 + 0.5 / scale);
+    return;
+  }
+  ctx.textBaseline = 'top';
+  ctx.lineWidth = 3 / scale;
+  ctx.strokeStyle = palette.panel;
+  ctx.strokeText(n.label, n.x, top);
+  ctx.fillStyle = palette.text;
+  ctx.fillText(n.label, n.x, top);
+}
+
 function linkColor(l) {
   const fade = Math.min(l.source.fade ?? 1, l.target.fade ?? 1);
-  if (isHot(l)) return rgba(palette.accent, 0.85);
-  return l.kind === 'co' ? rgba(palette.muted, 0.38 * fade) : rgba(palette.faction, 0.35 * fade);
+  if (isHot(l)) return rgba(palette.lime, 0.9);
+  return l.kind === 'co' ? rgba(palette.paper, 0.24 * fade) : rgba(palette.hair, 0.5 * fade);
 }
 
 // 连线每帧都要取颜色，几千条线反复拼字符串很慢；不透明度取到两位小数后缓存

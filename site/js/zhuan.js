@@ -1,6 +1,6 @@
 // 列传：按人。索引写在 data/annals/列传索引*.md，首见和条数由程序算。
 import { D } from './data.js';
-import { esc, href, KIND_LABEL } from './util.js';
+import { esc, href, KIND_LABEL, pageHead } from './util.js';
 import { inline, entryHtml, controlsHtml, wireControls, jumpToEntry } from './annals.js';
 import { makeShelf, OPTION_NONE, plainFirst, cnYearNumber, volumeOrder } from './shelf.js';
 
@@ -56,19 +56,20 @@ function detail(item, el, links) {
   const others = z.others.map(({ id }) => D.annalsEntry[id]).filter(Boolean);
   const chip = (facet, value, text = value) => `<a class="shelf-chip" href="${esc(links.filter(facet, value))}">${esc(facet)}：${esc(text)}</a>`;
   const seeEntry = ix.ev && D.annalsEntry[ix.ev] ? ` <a href="${href.annalsEntry(ix.ev)}">见此条</a>` : '';
-  el.innerHTML = `<div class="an-body">
-    <a class="shelf-back" href="${esc(links.back)}">← 列传索引</a>
-    <div class="sub">列传</div>
-    <h1>${esc(z.name)}传</h1>
-    <div class="sub">${z.span ? `${esc(z.span[0])}${z.span[1] !== z.span[0] ? ` 至 ${esc(z.span[1])}` : ''} · ` : ''}${entries.length} 条
-      · <a href="${href.char(z.name)}">人物页</a></div>
-    <div class="shelf-meta">
-      ${chip('出身', ix.origin, ix.place ? `${ix.origin} · ${ix.place}` : ix.origin)}
-      ${ix.race ? chip('族裔', ix.race) : ''}
-      ${ix.factions.map((f) => chip('所属', f)).join('')}
-      ${ix.fate ? chip('盖棺', ix.fate, ix.fate === '已' && ix.died ? `${FATE.已} · ${ix.died}` : FATE[ix.fate]) : ''}
-    </div>
-    ${ix.note || seeEntry ? `<div class="shelf-fate">${esc(ix.note)}${seeEntry}</div>` : ''}
+  el.innerHTML = `${pageHead({
+    en: 'BIOGRAPHY',
+    title: `${z.name}传`,
+    back: [links.back, '← 列传索引'],
+    sub: `${z.span ? `${esc(z.span[0])}${z.span[1] !== z.span[0] ? ` 至 ${esc(z.span[1])}` : ''} · ` : ''}<a href="${href.char(z.name)}">人物页</a>`,
+    tags: [
+      chip('出身', ix.origin, ix.place ? `${ix.origin} · ${ix.place}` : ix.origin),
+      ix.race ? chip('族裔', ix.race) : '',
+      ...ix.factions.map((f) => chip('所属', f)),
+      ix.fate ? chip('盖棺', ix.fate, ix.fate === '已' && ix.died ? `${FATE.已} · ${ix.died}` : FATE[ix.fate]) : '',
+    ].join(''),
+    note: ix.note || seeEntry ? `${esc(ix.note)}${seeEntry}` : '',
+    nums: [['条目', entries.length, '条', 'ENTRIES'], others.length ? ['其他出场', others.length, '条', 'ALSO IN'] : null],
+  })}<div class="an-body">
     ${z.summary.length ? `<div class="synopsis an-summary">${z.summary.map((p) => `<p>${inline(p)}</p>`).join('')}</div>` : ''}
     ${others.length ? `<details class="an-index"><summary>其他出场（${others.length} 条）</summary>
       <ol>${others.map((e) => `<li><a href="${href.annals(e.year, e.id)}"><span class="when">${esc(e.when)}</span>${inline(e.groups[0].gang)}</a></li>`).join('')}</ol>
@@ -81,6 +82,7 @@ function detail(item, el, links) {
 
 const shelf = makeShelf({
   route: 'zhuan', title: '列传', unit: '篇', placeholder: '搜人名、别名、经历……',
+  headNums: { facet: '盖棺', order: Object.keys(FATE), label: (v) => FATE[v] ?? v, unit: '传', unitEn: 'LIVES' },
   intro: '<b>出身</b>是这个人生长、来历所在的地区。<b>盖棺</b>分四种：盖棺定论是书中写明身死，来日方长是到最后一次出场还活着，生死未卜是下落不明或只有传闻，异数是常人的生死说不清的。左栏可以多选，同一项里是「或」，不同项之间是「且」。',
   facets: [
     { key: '盖棺', order: Object.keys(FATE), open: true, label: (v) => FATE[v] ?? v },

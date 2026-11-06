@@ -2,7 +2,9 @@
 // 一地一页：地理、势力两门列出全部地区势力，还没写正文的标「尚未成文」；条目写了 关: 的，正文下面接地区势力的资料。
 // 路由：#/bowu/<条目名或别名>。旧路由 #/powers/<id> 在 main.js 里转到这里。
 import { D } from './data.js';
-import { esc, href, powerChip, eventItem } from './util.js';
+import { esc, href, powerChip, eventItem, pageHead } from './util.js';
+
+const MEN_EN = { 地理: 'GEOGRAPHY', 势力: 'POWERS', 族裔: 'PEOPLES', 源石: 'ORIGINIUM', 科技: 'SCIENCE', 人文: 'CULTURE', 生灵: 'CREATURES', 远古: 'ANTIQUITY' };
 import { inline, quoteHtml, kaoyiHtml } from './annals.js';
 import { powerSections } from './powers.js';
 
@@ -70,6 +72,11 @@ export function mount(el, r) {
   const wi = side.querySelector('.bw-written input');
   wi.checked = onlyWritten;
   wi.addEventListener('change', () => { onlyWritten = wi.checked; renderList(); });
+  // 页头的八门：点一门，左栏只列这一门
+  content.addEventListener('click', (e) => {
+    const t = e.target.closest('.men-tile');
+    if (t) { men = t.dataset.m; renderList(); }
+  });
   update(r);
 }
 
@@ -77,7 +84,7 @@ export function update(r) {
   const n = resolve(r.parts[0]);
   renderList(n?.name);
   if (n) renderPage(n);
-  else content.innerHTML = `<h1>${esc(r.parts[0])}</h1><p class="muted">博物志里没有这个条目。</p>`;
+  else content.innerHTML = `${pageHead({ en: 'NOT FOUND', title: r.parts[0] })}<p class="muted">博物志里没有这个条目。</p>`;
   content.scrollTop = 0;
 }
 
@@ -123,14 +130,19 @@ function renderPage(n) {
   const related = mains.flatMap((p) => D.bowu.powers[p]?.related ?? []);
   const kind = n.pid ? P[n.pid].kind : 'plain';
   const named = w ? w.main.filter((p) => P[p].name !== n.name) : [];
-  content.innerHTML = `
-    <div class="profile-head"><h1>${esc(n.name)}</h1>
-      <span class="chip chip-${kind}">${esc(n.men)}</span>
-      ${w ? '' : '<span class="chip chip-plain bw-unwritten">尚未成文</span>'}
-    </div>
-    ${w?.aliases.length ? `<div class="sub">别名：${w.aliases.map(esc).join('、')}</div>` : ''}
-    ${named.length ? `<div class="sub">对应：${named.map((p) => esc(P[p].name)).join('、')}</div>` : ''}
-    ${w?.parent && !w.main.length ? `<div class="sub">上级：<a class="bw-link" href="${href.wu(w.parent)}">${esc(w.parent)}</a></div>` : ''}
+  const subs = [
+    w?.aliases.length ? `别名：${w.aliases.map(esc).join('、')}` : '',
+    named.length ? `对应：${named.map((p) => esc(P[p].name)).join('、')}` : '',
+    w?.parent && !w.main.length ? `上级：<a class="bw-link" href="${href.wu(w.parent)}">${esc(w.parent)}</a>` : '',
+  ].filter(Boolean);
+  content.innerHTML = `${pageHead({
+    en: MEN_EN[n.men] ?? 'ENCYCLOPEDIA',
+    title: n.name,
+    sub: subs.join(' · '),
+    tags: `<span class="chip chip-${kind}">${esc(n.men)}</span>${w ? '' : '<span class="chip chip-plain bw-unwritten">尚未成文</span>'}`,
+    aside: `<div class="men-tiles">${D.bowu.men.map((m) => `<button class="men-tile${m === n.men ? ' hot' : ''}" data-m="${m}">
+      <span>${esc(m)}</span><em>${MEN_EN[m] ?? ''}</em></button>`).join('')}</div>`,
+  })}
     ${w ? `<div class="bw-text">${entryBody(w)}</div>` : ''}
     ${mains.map((p) => `${w ? `<h3 class="bw-part">${esc(P[p].name)}的资料</h3>` : ''}${powerSections(p)}`).join('')}
     ${others.length ? `<h3 class="bw-part">相关的地区势力</h3>${others.map((p) => `
