@@ -859,7 +859,7 @@ def zhuan_index(probs: Problems, anchors: set[str], names: set[str], pattern: st
         if r["ev"] and r["ev"] not in anchors:
             probs.add(where, f"{name}：条「{r['ev']}」不存在")
         if r["fate"] == "已" and not r["died"]:
-            probs.add(where, f"{name}：已盖棺要写卒（年份，不知道写「不详」）")
+            probs.add(where, f"{name}：盖棺定论要写卒（年份，不知道写「不详」）")
         if not r["basis"]:
             probs.add(where, f"{name}：要写依据")
         out[name] = {"origin": r["origin"], "place": r["place"], "race": r["race"],

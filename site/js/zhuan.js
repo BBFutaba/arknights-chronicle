@@ -4,7 +4,7 @@ import { esc, href, KIND_LABEL } from './util.js';
 import { inline, entryHtml, controlsHtml, wireControls, jumpToEntry } from './annals.js';
 import { makeShelf, OPTION_NONE, plainFirst, cnYearNumber, volumeOrder } from './shelf.js';
 
-const FATE = { 已: '已盖棺', 未: '未盖棺', 未卜: '生死未卜', 异数: '异数' };
+const FATE = { 已: '盖棺定论', 未: '来日方长', 未卜: '生死未卜', 异数: '异数' };
 const ERAS = ['前纪与外纪', '一〇八〇至一〇九五年', '一〇九六至一〇九九年', '一一〇〇至一一〇三年', '不系年'];
 
 function eraOf(year) {
@@ -14,7 +14,7 @@ function eraOf(year) {
 }
 
 function fateTag(ix) {
-  if (ix.fate === '已') return ix.died && ix.died !== '不详' ? `卒于${ix.died}` : '已盖棺';
+  if (ix.fate === '已') return ix.died && ix.died !== '不详' ? `卒于${ix.died}` : FATE.已;
   return FATE[ix.fate];
 }
 
@@ -66,7 +66,7 @@ function detail(item, el, links) {
       ${chip('出身', ix.origin, ix.place ? `${ix.origin} · ${ix.place}` : ix.origin)}
       ${ix.race ? chip('族裔', ix.race) : ''}
       ${ix.factions.map((f) => chip('所属', f)).join('')}
-      ${ix.fate ? chip('盖棺', ix.fate, ix.fate === '已' && ix.died ? `已盖棺 · ${ix.died}` : FATE[ix.fate]) : ''}
+      ${ix.fate ? chip('盖棺', ix.fate, ix.fate === '已' && ix.died ? `${FATE.已} · ${ix.died}` : FATE[ix.fate]) : ''}
     </div>
     ${ix.note || seeEntry ? `<div class="shelf-fate">${esc(ix.note)}${seeEntry}</div>` : ''}
     ${z.summary.length ? `<div class="synopsis an-summary">${z.summary.map((p) => `<p>${inline(p)}</p>`).join('')}</div>` : ''}
@@ -81,7 +81,7 @@ function detail(item, el, links) {
 
 const shelf = makeShelf({
   route: 'zhuan', title: '列传', unit: '篇', placeholder: '搜人名、别名、经历……',
-  intro: '<b>出身</b>是这个人生长、来历所在的地区。<b>盖棺</b>取字面意思：已盖棺是书中写明身死，未盖棺是到最后一次出场还活着，生死未卜是下落不明或只有传闻，异数是常人的生死说不清的。左栏可以多选，同一项里是「或」，不同项之间是「且」。',
+  intro: '<b>出身</b>是这个人生长、来历所在的地区。<b>盖棺</b>分四种：盖棺定论是书中写明身死，来日方长是到最后一次出场还活着，生死未卜是下落不明或只有传闻，异数是常人的生死说不清的。左栏可以多选，同一项里是「或」，不同项之间是「且」。',
   facets: [
     { key: '盖棺', order: Object.keys(FATE), open: true, label: (v) => FATE[v] ?? v },
     { key: '出身', open: true },
