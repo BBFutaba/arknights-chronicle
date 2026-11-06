@@ -59,6 +59,8 @@ class Registry:
             cur = tomllib.load(f)
         sp = cur.get("speakers", {})
         self.aliases: dict[str, str] = {**cur.get("aliases", {}), **_book_aliases()}
+        # 同一个名字在不同剧情里指不同的人：按分集 id 或组 id 改写说话人，优先于上面的全局别名
+        self.scoped_aliases: dict[str, dict[str, str]] = cur.get("scoped_aliases", {})
         # 同名不同人：这些干员 id 归到别的干员名下，名字留给剧本里的同名说话人
         self.op_owner: dict[str, str] = cur.get("operator_owner", {})
         self.ignore = set(sp.get("ignore", []))
@@ -148,6 +150,15 @@ class Registry:
         name = raw.strip().strip("“”\"「」『』")
         # 「Mantra？」：身份未揭晓时的写法，和「Mantra」是同一个人
         return self.aliases.get(name) or self.aliases.get(name.rstrip("？?")) or name
+
+    def scoped_speaker(self, raw: str, episode_id: str, group_id: str) -> str:
+        """分集的设置优先于组的设置；没有设置就原样返回。"""
+        name = raw.strip()
+        for scope in (episode_id, group_id):
+            target = self.scoped_aliases.get(scope, {}).get(name)
+            if target:
+                return target
+        return raw
 
     def is_generic(self, name: str) -> bool:
         if name in self.keep:

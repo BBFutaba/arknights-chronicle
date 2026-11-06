@@ -88,7 +88,7 @@ function renderProfile(name) {
       <span class="tags"><span class="chip chip-${c.kind}">${KIND_LABEL[c.kind]}</span>
         ${c.profession ? `<span class="chip chip-plain">${esc(c.profession)} ${stars}</span>` : ''}</span>
     </div>
-    ${c.aliases.length ? `<div class="sub">别名 / 异格：${c.aliases.map(esc).join('、')}</div>` : ''}
+    ${c.aliases.length ? `<div class="sub">又名：${c.aliases.map(esc).join('、')}</div>` : ''}
     <div class="actions">
       ${evs.length ? `<a class="btn" href="${href.timeline({ char: name })}">在时间轴中查看（${evs.length} 条事件）</a>` : ''}
       <a class="btn" href="${href.graph('char', name)}">在关系图中查看</a>

@@ -74,3 +74,13 @@ name = "整合运动"
 # 剧本里说话的「酒神」是被他刺杀的老剧团长（act43side_08_end:62-69）。
 [operator_owner]
 "char_1042_phatm2" = "傀影"
+
+# 同一个名字在不同剧情里指不同的人。键是分集 id 或组 id，分集优先。
+[scoped_aliases."act55side"]
+"卡特琳娜" = "卡特琳娜·佐洛塔列娃"
+
+[scoped_aliases."act55side_level_act55side_10_end"]
+"图林" = "伊凡·图林"
+
+[scoped_aliases."act55side_level_act55side_st04"]
+"伊凡·图林" = "图林"

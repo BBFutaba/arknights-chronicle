@@ -33,7 +33,7 @@ def analyze_episode(ep: gamedata.Episode, reg: Registry) -> EpisodeData:
         if line.kind == "decision":
             d.lines[reg.doctor.name] += 1
         elif line.kind == "dialogue" and line.speaker:
-            chars = reg.resolve_speakers(line.speaker)
+            chars = reg.resolve_speakers(reg.scoped_speaker(line.speaker, ep.story_id, ep.group_id))
             for ch in chars:
                 d.lines[ch.name] += 1
             if not chars:
