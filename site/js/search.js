@@ -1,4 +1,4 @@
-// 顶栏全局搜索：人物、地区势力、剧情组、分集、年表事件。
+// 顶栏全局搜索：人物、博物志（含全部地区势力）、剧情组、分集、年表事件。
 import { D } from './data.js';
 import { esc, href, epLabel, groupLabel, KIND_LABEL } from './util.js';
 
@@ -11,8 +11,13 @@ function buildIndex() {
       sub: KIND_LABEL[c.kind] + (c.appear.length ? ` · 出场 ${c.appear.reduce((n, a) => n + a[1].length, 0)} 集` : ''),
       url: href.char(name), weight: c.appear.length + c.events.length });
   }
+  for (const w of D.bowu.entries) {
+    index.push({ cat: '博物志', keys: [w.name, ...w.aliases, ...w.main.map((id) => D.powers[id].name)], label: w.name,
+      sub: w.men, url: href.wu(w.name), weight: 100 });
+  }
   for (const [id, p] of Object.entries(D.powers)) {
-    index.push({ cat: '地区与势力', keys: [p.name], label: p.name, sub: p.kind === 'region' ? '地区' : '势力',
+    if (D.bowu.powers[id]?.entry) continue;
+    index.push({ cat: '博物志', keys: [p.name], label: p.name, sub: `${p.kind === 'region' ? '地理' : '势力'} · 尚未成文`,
       url: href.power(id), weight: 100 });
   }
   for (const g of D.groups) {

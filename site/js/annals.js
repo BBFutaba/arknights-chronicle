@@ -54,7 +54,7 @@ function renderSide(vol, activeOther) {
       + (v.cunmu?.length ? `<a class="list-item an-toc" href="#/annals/${v.year}?s=存目">
         <span class="grow muted">存目</span><span class="n">${v.cunmu.length}</span></a>` : '') : '';
     return `${head}<a class="list-item${active ? ' active' : ''}" href="${href.annals(v.year)}">
-        <span class="grow">${esc(v.title.replace(/^结晶纪元/, ''))}</span><span class="n">${v.stats.gang} 纲</span></a>${toc}`;
+        <span class="grow">${esc(v.title.replace(/^泰拉历/, ''))}</span><span class="n">${v.stats.gang} 纲</span></a>${toc}`;
   }).join('');
   const benmo = D.annals.benmo.map((b) => `
     <a class="list-item${activeOther === b.title ? ' active' : ''}" href="${href.benmo(b.title)}">
@@ -225,11 +225,12 @@ function entryHtml(e, withWhen = false) {
 }
 
 // 正文里只有两种标记：**加粗** 和 [[人名]]
-function inline(s) {
+// other：不是人物时怎么办，博物志用它把 [[条目]] 也变成链接
+export function inline(s, other) {
   return esc(s)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, name, label) => (charOf(name)
-      ? `<a class="an-p" href="${href.char(name)}">${label ?? name}</a>` : (label ?? name)));
+      ? `<a class="an-p" href="${href.char(name)}">${label ?? name}</a>` : (other?.(name, label) ?? label ?? name)));
 }
 
 function personChip(token) {
@@ -237,7 +238,7 @@ function personChip(token) {
   return m ? charChip(m[1]) : `<span class="chip chip-plain">${inline(token)}</span>`;
 }
 
-function quoteHtml(q) {
+export function quoteHtml(q) {
   if (q.type === 'story') {
     const lines = q.ranges.map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(',');
     const body = q.blocks.map((b) => b.map(quoteLine).join('')).join('<div class="ql gap">……</div>');
@@ -256,7 +257,7 @@ function quoteLine([k, sp, t]) {
   return '';
 }
 
-function kaoyiHtml(items) {
+export function kaoyiHtml(items, other) {
   if (!items.length) return '';
   let html = '', list = [];
   const flush = () => {
@@ -264,8 +265,8 @@ function kaoyiHtml(items) {
     list = [];
   };
   for (const k of items) {
-    if (k.li) list.push(`<li>${inline(k.text)}</li>`);
-    else { flush(); html += `<p>${inline(k.text)}</p>`; }
+    if (k.li) list.push(`<li>${inline(k.text, other)}</li>`);
+    else { flush(); html += `<p>${inline(k.text, other)}</p>`; }
   }
   flush();
   return `<details class="an-kaoyi"><summary>考异</summary>${html}</details>`;

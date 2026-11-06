@@ -7,7 +7,9 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
 const enc = encodeURIComponent;
 export const href = {
   char: (n) => `#/chars/${enc(D.charAlias?.[n] ?? n)}`,
-  power: (id) => `#/powers/${enc(id)}`,
+  // 地区势力在博物志里只有一页：写了条目的用条目名，没写的用自己的名字
+  power: (id) => `#/bowu/${enc(D.bowu?.powers[id]?.entry ?? D.powers[id]?.name ?? id)}`,
+  wu: (name) => (name ? `#/bowu/${enc(name)}` : '#/bowu'),
   group: (gid) => `#/story/${enc(gid)}`,
   ep: (sid) => `#/story/${enc(D.epById[sid]?.group.id ?? '')}/${enc(sid)}`,
   event: (id) => `#/timeline?ev=${enc(id)}`,

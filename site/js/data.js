@@ -3,6 +3,7 @@ export const D = {
   meta: null, groups: [], groupById: {}, epById: {}, chars: {}, powers: {},
   events: [], eventById: {}, threads: {},
   annals: null, annalsEntry: {}, annalsByEvent: {}, benmoByTitle: {}, zhuanByName: {}, annalsByPerson: {},
+  bowu: null,
 };
 
 async function json(path) {
@@ -39,6 +40,9 @@ export async function loadAll() {
   for (const [a, name] of Object.entries(D.annals?.aliases ?? {})) if (D.chars[name]) D.charAlias[a] ??= name;
   for (const b of D.annals?.benmo ?? []) D.benmoByTitle[b.title] = b;
   for (const z of D.annals?.liezhuan ?? []) D.zhuanByName[z.name] = z;
+  // 博物志也是可选的：还没有 bowu.json 时只列地区势力
+  D.bowu = await json('data/bowu.json').catch(() => (
+    { men: ['地理', '势力', '族裔', '源石', '科技', '人文', '生灵', '远古'], entries: [], powers: {} }));
   // 一人多名：别名和正名共用列传和编年史出场
   for (const [alias, name] of Object.entries(D.annals?.aliases ?? {})) {
     if (D.zhuanByName[name]) D.zhuanByName[alias] = D.zhuanByName[name];

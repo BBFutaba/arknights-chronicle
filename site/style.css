@@ -288,6 +288,27 @@ details[open] > summary { color: var(--text); }
 .gang-only .an-group + .an-group { margin-top: 4px; padding-top: 4px; border-top: none; }
 .ln.hl { background: var(--sel); border-radius: 4px; }
 
+/* ---------------------------------------------------------------- 博物志 */
+.bw-side .seg-ctrl button { padding: 1px 8px; font-size: 12.5px; }
+.bw-written { align-self: flex-start; font-size: 12.5px; }
+.bw-empty { padding: 2px 8px 4px; }
+.bw-text { max-width: 780px; margin-top: 10px; }
+.bw-link { color: var(--c-region); }
+.bw-part { font-size: 15px; margin: 26px 0 6px; padding-top: 14px; border-top: 1px dashed var(--line); color: var(--muted); }
+.bw-unwritten { --cc: var(--c-faction); }
+.bw-related { margin: 6px 0; }
+.bw-row { grid-template-columns: minmax(5em, max-content) 1fr; }
+.bw-hit { background: var(--sel); color: inherit; border-radius: 3px; padding: 0 1px; }
+.bw-cite { display: block; text-align: right; font-style: normal; font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+/* 设定集的引文：埃里克森的正文像印出来的书页，凯尔希的批注是蓝墨水手写 */
+.bw-book { margin: 12px 0; padding: 10px 16px 8px; background: var(--panel-2); border-left: 3px solid var(--line); border-radius: 0 8px 8px 0; }
+.bw-book p { margin: 0; line-height: 1.9; }
+.bw-author { font-family: "Songti SC", "SimSun", "Noto Serif CJK SC", serif; border-left-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.bw-author p { text-indent: 2em; font-size: 14.5px; }
+.bw-author .bw-cite { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+.bw-note { margin: 12px 0; padding: 2px 0 2px 14px; border-left: 2px dashed color-mix(in srgb, var(--c-operator) 55%, transparent); color: var(--c-operator); }
+.bw-note p { margin: 0; font-family: "KaiTi", "STKaiti", "Kaiti SC", "AR PL UKai CN", serif; font-size: 16px; line-height: 1.8; }
+
 /* ---------------------------------------------------------------- 关系图 */
 .graph-side { width: 260px; }
 .graph-main { flex: 1; min-width: 0; position: relative; }

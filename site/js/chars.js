@@ -16,6 +16,7 @@ export function mount(el, r) {
       <select class="ch-power"><option value="">全部地区与势力</option>${Object.entries(D.powers)
         .sort((a, b) => a[1].kind.localeCompare(b[1].kind) || a[1].name.localeCompare(b[1].name, 'zh'))
         .map(([id, p]) => `<option value="${id}">${p.kind === 'region' ? '地区' : '势力'}：${esc(p.name)}</option>`).join('')}</select>
+      <a class="small bw-link ch-power-link" hidden></a>
       <select class="ch-sort">
         <option value="appear">按出场集数</option><option value="lines">按台词数</option>
         <option value="events">按年表事件数</option><option value="name">按名字</option></select>
@@ -33,7 +34,13 @@ export function mount(el, r) {
   });
   const ps = side.querySelector('.ch-power');
   ps.value = power;
-  ps.addEventListener('change', () => { power = ps.value; renderList(); });
+  const pl = side.querySelector('.ch-power-link');
+  const showPowerLink = () => {
+    pl.hidden = !power;
+    if (power) { pl.href = href.power(power); pl.textContent = `查看${D.powers[power].name}的博物志页面`; }
+  };
+  showPowerLink();
+  ps.addEventListener('change', () => { power = ps.value; showPowerLink(); renderList(); });
   const ss = side.querySelector('.ch-sort');
   ss.value = sort;
   ss.addEventListener('change', () => { sort = ss.value; renderList(); });
@@ -116,7 +123,7 @@ function annalsSection(name) {
   if (!ids.length) return '';
   const item = (id) => {
     const e = D.annalsEntry[id];
-    return `<a class="event-item" href="${href.annalsEntry(id)}"><span class="when">${esc(e.when.replace('结晶纪元', ''))}</span>
+    return `<a class="event-item" href="${href.annalsEntry(id)}"><span class="when">${esc(e.when.replace(/^(结晶纪元|泰拉历)/, ''))}</span>
       <span></span><span class="text">${esc(e.groups[0].gang.replace(/\*\*/g, ''))}</span></a>`;
   };
   const head = ids.slice(0, 8).map(item).join('');

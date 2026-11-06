@@ -22,21 +22,25 @@
 凡例在 data/annals/凡例.md。build 把原文从 site/data 里取出，导出 site/data/annals.json
 （网页「编年」页用）和 annals/<年份>.md（含原文，不提交）。
 
+博物志在 data/annals/博物志/*.md，每条以一行 @物 开头，格式见 data/annals/博物志须知.md。build 导出
+site/data/bowu.json（网页「博物志」页用），只含编者文字和条目里写的短引。
+
     python -m pipeline.annals show <分集id> [起 止]   带行号列出剧本
     python -m pipeline.annals find <正则> [组id]      在剧本里搜索
-    python -m pipeline.annals check <稿件路径>        检查一个稿件文件
+    python -m pipeline.annals check <稿件路径>        检查一个稿件文件（卷稿和博物志都用它）
     python -m pipeline.annals build                   检查并导出全部卷和纪事本末
     python -m pipeline.annals zhuan <人物>            列出某人列传收录的条目，供写概述
     python -m pipeline.annals benmo <事名>            列出某件纪事本末的概述和所收条目
     python -m pipeline.annals long <稿件路径>         列出目超过三百字的组，删定用
     python -m pipeline.annals rawfind <正则>          在全部原始游戏文本里搜索（含没收进剧本库的）
-    python -m pipeline.annals quotes [输出文件]       核对纲目考异里的「」短引，列出全部游戏文本里都找不到的
+    python -m pipeline.annals quotes [输出文件]       核对纲目考异和博物志里的短引，列出全部文本里都找不到的
 """
 from __future__ import annotations
 
 import json
 import re
 import sys
+import tomllib
 from collections import Counter
 from functools import cache
 from pathlib import Path
@@ -92,6 +96,11 @@ def stories(group_id: str) -> dict[str, dict]:
     return json.loads((SITE_DATA / "stories" / f"{group_id}.json").read_text(encoding="utf-8"))
 
 
+def norm_text(t: str) -> str:
+    """比对短引用：去掉空白和标点。"""
+    return re.sub(r"[\s，。、！？：；,.!?:;“”\"‘’'「」『』《》（）()—\-…·]", "", t.replace("{@Nickname}", "博士"))
+
+
 def lines_of(story_id: str) -> list[list]:
     if story_id not in episode_index():
         raise KeyError(f"没有这个分集：{story_id}")
@@ -110,6 +119,18 @@ def events() -> dict[str, dict]:
     return {e["id"]: e for e in data["events"]}
 
 
+@cache
+def powers() -> dict[str, dict]:
+    return json.loads((SITE_DATA / "powers.json").read_text(encoding="utf-8"))
+
+
+@cache
+def power_match() -> dict[str, list[str]]:
+    """entities.toml 里地区势力的其他写法。单字的名字（炎、东）靠它才统计得到。"""
+    with open(config.CURATED / "entities.toml", "rb") as f:
+        return tomllib.load(f).get("mentions", {}).get("match", {})
+
+
 def eff_year(e: dict) -> int | None:
     """PRTS 把「11 世纪 30 年代」记作 year=30，还原成 1030。"""
     y = e.get("year")
@@ -120,7 +141,7 @@ def eff_year(e: dict) -> int | None:
 
 # 前纪、外纪的事件散在一百多个年份，不能一年一卷：合成一卷（目录名即卷名），卷内按年表先后排，以年为大标题。
 MERGED = {
-    "外纪": ("外纪 · 结晶纪元之前", lambda e: e["era"] in ("结晶纪元之前", "可确认的大致时间点")),
+    "外纪": ("外纪 · 结晶时代之前", lambda e: e["era"] in ("结晶纪元之前", "可确认的大致时间点")),
     "前纪甲": ("前纪 · 十一世纪前", lambda e: "11 世纪前" in e["era"]),
     "前纪乙": ("前纪 · 一〇〇〇至一〇五九年", lambda e: "00 年代" in e["era"] and (eff_year(e) or 0) < 1060),
     "前纪丙": ("前纪 · 一〇六〇至一〇七九年", lambda e: "00 年代" in e["era"] and (eff_year(e) or 0) >= 1060),
@@ -531,8 +552,11 @@ def parse_entries(path: Path, probs: Problems) -> list[Entry]:
             probs.add(e.where, f"{tag} 是存目，要在【考异】里写明不录的理由")
         if e.cunmu and (e.shi or e.zhuan):
             probs.add(e.where, f"{tag} 是存目，不能标归属")
-        if e.sup and (not has_kaoyi or not any(g["quotes"] for g in e.groups)):
-            probs.add(e.where, f"{tag} 是补条，要有原文和考异（写明年表不载与日期依据）")
+        # 只见于书外（设定集、影片、漫画）的事按凡例只书纲，所以补条也可以是附记，靠考异交代出处
+        if e.sup and not has_kaoyi:
+            probs.add(e.where, f"{tag} 是补条，要有考异（写明年表不载与日期依据）")
+        if e.sup and e.main and not any(g["quotes"] for g in e.groups):
+            probs.add(e.where, f"{tag} 是立条的补条，要有原文；只见于书外的事写成附记（加 附）")
     return out
 
 
@@ -602,8 +626,20 @@ def volume_years() -> list:
     return merged + sorted(int(p.name) for p in SRC_DIR.iterdir() if p.is_dir() and p.name.isdigit()) + tail
 
 
+@cache
+def sup_ids() -> frozenset[str]:
+    """全部补条的编号（补:名称）。"""
+    out = set()
+    for year in volume_years():
+        for path in (SRC_DIR / str(year)).glob("*.md"):
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                if m := re.match(r"@条\s+(补[:：]\S+)", raw):
+                    out.add(m[1].replace("：", ":"))
+    return frozenset(out)
+
+
 def volume_title(year) -> str:
-    return MERGED[year][0] if year in MERGED else f"结晶纪元{cn_year(year)}年"
+    return MERGED[year][0] if year in MERGED else f"泰拉历{cn_year(year)}年"
 
 
 def load_volume(year: int, probs: Problems) -> list[Entry]:
@@ -784,6 +820,438 @@ def load_liezhuan(probs: Problems) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- 博物志
+
+WU_DIR = SRC_DIR / "博物志"
+RAW_DIR = ROOT / "Raw Data"
+MEN = ["地理", "势力", "族裔", "源石", "科技", "人文", "生灵", "远古"]
+POWER_MEN = ("地理", "势力")  # 地区势力的页面只进这两门
+WU_OPTION = re.compile(r"(门|别|关|上)[:：](.*)")
+WU_FIELD = re.compile(r"^【(释|说|沿革|见|考异)】\s*(.*)$")
+WU_BLOCK = {"释": "shi", "说": "shuo", "沿革": "yange", "见": "see"}
+WU_SEE = re.compile(r"(条|传|事|物)[:：](.+)")
+SPLIT_LIST = re.compile(r"[,，]")
+# 书外引文只录短句，不解析行号：@书 书名 p.页 说话人 「短引」，@影 片名 时间 说话人 「短引」，@漫 书名 话 p页 说话人 「短引」
+EXT_PAGE = re.compile(r"^(.+?)\s+(p\.\S+|p\d\S*)\s*([^「]*?)\s*「(.+)」\s*$")
+EXT_TIME = re.compile(r"^(.+?)\s+(\d{1,2}:\d{2}(?::\d{2})?(?:[-~]\d{1,2}:\d{2}(?::\d{2})?)?)\s*([^「]*?)\s*「(.+)」\s*$")
+BOOK_SIGN = {"埃里克森": "E.E. 埃里克森"}  # 设定集是世界观内的人物写的，网页上按本人署名
+SHORT_MAX = 80     # 书外短引超过这个字数给提示：全文不进网页数据
+FUZZY_MIN = 0.7    # 书外全文是 OCR，有错字：字符重合度低于这个比例才给提示
+MENTION_ANNALS, MENTION_ZHUAN = 10, 4  # 「书中提及」列出的条数，其余只计总数
+
+
+class Wu:
+    """博物志的一个条目。fields 里段落是字符串，引文是字典，按稿件里的先后排。"""
+
+    def __init__(self, name: str, where: str):
+        self.name, self.where = name, where
+        self.men: str | None = None
+        self.aliases: list[str] = []
+        self.powers: list[str] = []     # 关:
+        self.main: list[str] = []       # 这条就是哪个地区势力的页面（程序定，见 link_wu）
+        self.parent: str | None = None  # 上:
+        self.fields: dict[str, list] = {"shi": [], "shuo": [], "yange": [], "see": []}
+        self.see: dict[str, list[str]] = {"events": [], "zhuan": [], "shi": [], "wu": []}
+        self.kaoyi: list[dict] = []
+        self.ext: list[tuple[str, dict]] = []  # (位置, 书外引文)，留给模糊比对
+
+    def texts(self) -> list[tuple[str, str]]:
+        """编者写的文字：(字段, 一段)。"""
+        out = [(label, t) for label, key in (("释", "shi"), ("说", "shuo"), ("沿革", "yange"))
+               for t in self.fields[key] if isinstance(t, str)]
+        return out + [("考异", k["text"]) for k in self.kaoyi]
+
+
+def parse_wu_head(s: str, where: str, probs: Problems) -> Wu:
+    """@物 名字 门:… 别:… 关:… 上:…。名字可以带空格（Ave Mujica），到第一个选项为止。"""
+    name, opts = [], []
+    for tok in s[2:].split():
+        (opts if opts or WU_OPTION.fullmatch(tok) else name).append(tok)
+    w = Wu(" ".join(name), where)
+    if not w.name:
+        probs.add(where, "@物 没写条目名")
+    for tok in opts:
+        m = WU_OPTION.fullmatch(tok)
+        if not m:
+            probs.add(where, f"不认识的选项：{tok}")
+        elif m[1] == "门":
+            w.men = m[2]
+        elif m[1] == "别":
+            w.aliases += [v for v in SPLIT_LIST.split(m[2]) if v]
+        elif m[1] == "关":
+            for pid in filter(None, SPLIT_LIST.split(m[2])):
+                if pid in powers():
+                    w.powers.append(pid)
+                else:
+                    probs.add(where, f"关:{pid} 不是地区势力的 id（见 site/data/powers.json 的键）")
+        else:
+            w.parent = m[2]
+    if w.men not in MEN:
+        probs.add(where, f"「{w.name}」的门要写 门:{'、'.join(MEN)} 之一")
+    return w
+
+
+def wu_profile_quote(args: str, where: str, probs: Problems) -> dict | None:
+    """@档 干员名·档案节名 「锚」。也接受编年史的写法：@档 干员名 档案节名 「锚」。"""
+    head, _, rest = args.partition(" ")
+    name, dot, section = head.partition("·")
+    if dot and canon(name) in characters():
+        return profile_quote(f"{name} {section} {rest}", where, probs)
+    return profile_quote(args, where, probs)
+
+
+def ext_quote(kind: str, args: str, where: str, probs: Problems, notes: list[str]) -> dict | None:
+    """@书、@影、@漫：只留短引和出处。说话人可以不写。"""
+    m = (EXT_TIME if kind == "@影" else EXT_PAGE).match(args)
+    if not m:
+        probs.add(where, f"{kind} 格式不对：{args}（见 data/annals/博物志须知.md）")
+        return None
+    head, loc, who, text = m.groups()
+    if len(text) > SHORT_MAX:
+        notes.append(f"{where} {kind} 短引偏长（{len(text)} 字），书外引文只录短句")
+    if kind == "@书":
+        return {"type": "book", "title": head, "page": loc, "who": who, "sign": BOOK_SIGN.get(who, who), "text": text,
+                "style": "note" if who.endswith("批注") else "author" if who in BOOK_SIGN else "quote"}
+    if kind == "@影":
+        return {"type": "video", "title": head, "time": loc, "who": who, "text": text}
+    title, _, ep = head.partition(" ")
+    return {"type": "comic", "title": title, "ep": ep.strip(), "page": loc, "who": who, "text": text}
+
+
+def wu_quote(kind: str, args: str, where: str, probs: Problems, notes: list[str]) -> dict | None:
+    if kind == "@引":
+        return story_quote(args, where, probs)
+    if kind == "@档":
+        return wu_profile_quote(args, where, probs)
+    if kind in ("@书", "@影", "@漫"):
+        return ext_quote(kind, args, where, probs, notes)
+    probs.add(where, f"不认识的指令：{kind}")
+    return None
+
+
+def wu_line(w: Wu, field: str, s: str, where: str, probs: Problems, notes: list[str]):
+    """把字段里的一行放进条目：引文指令、【见】的链接、考异的条目，其余是正文段落。"""
+    if s.startswith("@"):
+        if field == "考异":
+            probs.add(where, "【考异】里不放引文指令，引文写在【说】【沿革】【见】里")
+            return
+        kind, _, args = s.partition(" ")
+        q = wu_quote(kind, args.strip(), where, probs, notes)
+        if q:
+            w.fields[WU_BLOCK[field]].append(q)
+            if q["type"] in ("book", "video", "comic"):
+                w.ext.append((where, q))
+    elif field == "见":
+        for tok in s.split():
+            m = WU_SEE.fullmatch(tok)
+            if not m:
+                probs.add(where, f"【见】不认识：{tok}（可写 条:ev0123,ev0456 传:人物 事:纪事本末 物:条目）")
+                continue
+            vals = [v for v in SPLIT_LIST.split(m[2]) if v]
+            if m[1] == "条":
+                w.see["events"] += [v.replace("：", ":") for v in vals]  # 补条：补:名称
+            elif m[1] == "传":
+                w.see["zhuan"] += [canon(v) for v in vals]
+            else:
+                w.see["shi" if m[1] == "事" else "wu"] += vals
+    elif field == "考异":
+        li = s.startswith("- ")
+        w.kaoyi.append({"li": li, "text": s[2:].strip() if li else s})
+    else:
+        w.fields[WU_BLOCK[field]].append(s)
+
+
+def parse_wu(path: Path, probs: Problems, notes: list[str]) -> list[Wu]:
+    out: list[Wu] = []
+    field = None
+    for no, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        s, where = raw.strip(), f"{path.name}:{no}"
+        if not s or s.startswith(("#", "<!--")):
+            continue
+        if s.startswith("@物"):
+            out.append(parse_wu_head(s, where, probs))
+            field = None
+            continue
+        if not out:
+            probs.add(where, "第一条 @物 之前不能有正文")
+            continue
+        m = WU_FIELD.match(s)
+        if m:
+            field = m[1]
+            if m[2]:
+                wu_line(out[-1], field, m[2], where, probs, notes)
+        elif field is None:
+            probs.add(where, "这一行要放在【释】【说】【沿革】【见】【考异】之内")
+        else:
+            wu_line(out[-1], field, s, where, probs, notes)
+    for w in out:
+        if not any(isinstance(t, str) for t in w.fields["shi"]):
+            probs.add(w.where, f"「{w.name}」缺少【释】")
+    return out
+
+
+def link_wu(items: list[Wu], probs: Problems, notes: list[str]):
+    """跨条目的检查：重名、上级、【见】的去处；定下每个地区势力的页面。
+
+    一个地区势力只有一页。条目名或别名就是地区势力的名字，这条就是它的页面；否则，地理、势力门里
+    只写了一个 关:、又没写 上: 的条目也算。其余写了 关: 的条目只是相关条目。
+    """
+    P = powers()
+    names: dict[str, Wu] = {}
+    for w in items:
+        for n in dict.fromkeys([w.name, *w.aliases]):
+            if n in names:
+                probs.add(w.where, f"「{n}」已被条目「{names[n].name}」（{names[n].where}）占用")
+            else:
+                names[n] = w
+    by_name = {p["name"]: pid for pid, p in P.items()}
+    owners: dict[str, Wu] = {}
+    for w in items:
+        for n in (w.name, *w.aliases):
+            pid = by_name.get(n)
+            if pid and pid not in w.powers:
+                probs.add(w.where, f"「{n}」是地区势力的名字，要写 关:{pid}")
+            elif pid:
+                owners.setdefault(pid, w)
+    for w in items:
+        if w.men in POWER_MEN and len(w.powers) == 1 and not w.parent:
+            pid = w.powers[0]
+            if owners.setdefault(pid, w) is not w:
+                notes.append(f"{w.where} 「{w.name}」：「{P[pid]['name']}」的页面已是「{owners[pid].name}」，这条只算相关条目")
+    for w in items:
+        w.main = [pid for pid, o in owners.items() if o is w]
+        if w.main and w.men not in POWER_MEN:
+            probs.add(w.where, f"「{w.name}」是地区势力的页面，门要写地理或势力")
+
+    def page(n: str) -> str | None:
+        if n in names:
+            return names[n].name
+        if n in by_name:
+            return owners[by_name[n]].name if by_name[n] in owners else n
+        return None
+
+    entry_of = {w.name: w for w in items}
+    for w in items:
+        if not w.parent:
+            continue
+        target = page(w.parent)
+        if target is None or target == w.name:
+            probs.add(w.where, f"上:{w.parent} 要写别的条目或地区势力的名字")
+            w.parent = None
+        else:
+            w.parent = target
+    for w in items:
+        seen, up = {w.name}, w.parent
+        while up:
+            if up in seen:
+                probs.add(w.where, f"「{w.name}」的 上: 绕成了圈")
+                w.parent = None
+                break
+            seen.add(up)
+            up = entry_of[up].parent if up in entry_of else None
+
+    titles = {b["title"] for b in load_benmo(Problems())}
+    zhuan = {z["name"] for z in load_liezhuan(Problems())}
+    people = set(characters()) | {a for c in characters().values() for a in c["aliases"]} | set(aliases())
+    for w in items:
+        for i in w.see["events"]:
+            if i not in events() and i not in sup_ids():
+                probs.add(w.where, f"「{w.name}」【见】没有这个事件：{i}")
+        for n in w.see["zhuan"]:
+            if n not in zhuan and n in characters():
+                notes.append(f"{w.where} 「{w.name}」【见】：{n} 没有列传，链到人物页")
+            elif n not in zhuan:
+                probs.add(w.where, f"「{w.name}」【见】列传和人物页里都没有「{n}」")
+        for t in w.see["shi"]:
+            if t not in titles:
+                probs.add(w.where, f"「{w.name}」【见】纪事本末里没有「{t}」")
+        for n in w.see["wu"]:
+            if page(n) is None:
+                probs.add(w.where, f"「{w.name}」【见】博物志里没有「{n}」")
+        for _, t in w.texts():
+            for n in re.findall(r"\[\[([^\]|]+)", t):
+                if n not in people and page(n) is None:
+                    notes.append(f"{w.where} 「{w.name}」：[[{n}]] 不是人物也不是博物志条目，网页上不会成为链接")
+
+
+def load_wu(probs: Problems, notes: list[str]) -> list[Wu]:
+    items: list[Wu] = []
+    for path in sorted(WU_DIR.glob("*.md")):
+        items += parse_wu(path, probs, notes)
+    link_wu(items, probs, notes)
+    return items
+
+
+# 书外全文（Raw Data/，不进 git，也不进网页数据）：只用来核对短引。OCR 有错字，只做模糊比对，还没生成就跳过。
+
+
+@cache
+def raw_text(path: Path) -> tuple[str, dict[str, list[int]]]:
+    """去掉页眉、时间戳和低置信标记，规范化，再建二字索引。"""
+    kept = []
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if not line.startswith(("===", "###", "# ")):
+            kept.append(re.sub(r"^(\d{2}:\d{2}\s+)?(\[\?\]\s*)?", "", line))
+    text = norm_text("".join(kept))
+    grams: dict[str, list[int]] = {}
+    for i in range(len(text) - 1):
+        grams.setdefault(text[i:i + 2], []).append(i)
+    return text, grams
+
+
+def piece_overlap(q: str, text: str, grams: dict[str, list[int]]) -> float:
+    """q 在全文里最像的那一段，q 的字符有多少比例对得上。用二字索引投票找位置，再比字符。"""
+    if q in text:
+        return 1.0
+    votes: Counter = Counter()
+    for i in range(len(q) - 1):
+        for pos in grams.get(q[i:i + 2], ()):
+            votes[pos - i] += 1
+    need, best = Counter(q), 0.0
+    for start, _ in votes.most_common(10):
+        window = Counter(text[max(start, 0):start + len(q) + len(q) // 4 + 2])
+        best = max(best, sum((need & window).values()) / len(q))
+    return best
+
+
+def raw_overlap(quote: str, paths: list[Path]) -> float:
+    """省略号隔开的几段分别比，取最低的。"""
+    pieces = [x for x in (norm_text(p) for p in re.split(r"……|…", quote)) if len(x) >= 2]
+    if not pieces:
+        return 1.0
+    return min(max(piece_overlap(x, *raw_text(p)) for p in paths) for x in pieces)
+
+
+def raw_files(q: dict) -> list[Path]:
+    """这条书外引文该到哪些全文文件里核对；还没生成就返回空。"""
+    squeeze = lambda t: re.sub(r"[\s\[\]【】《》()（）_·]", "", t)
+    title = squeeze(q["title"])
+    if q["type"] == "book":
+        return [p for p in [RAW_DIR / q["title"] / "全文.txt"] if p.exists()]
+    if q["type"] == "video":
+        return [p for p in (RAW_DIR / "视频" / "字幕").glob("*.txt") if title in squeeze(p.stem)]
+    return [p for p in (RAW_DIR / "漫画").glob("*/ocr.txt") if title in squeeze(p.parent.name)]
+
+
+def all_raw_files() -> list[Path]:
+    return [*RAW_DIR.glob("*/全文.txt"), *(RAW_DIR / "视频" / "字幕").glob("*.txt"), *(RAW_DIR / "漫画").glob("*/ocr.txt")]
+
+
+def verify_ext(q: dict, where: str, notes: list[str], tally: Counter) -> bool:
+    """核对一条书外引文，对不上就记一条提示。全文文件不存在算跳过。"""
+    paths = raw_files(q)
+    if not paths:
+        tally["skipped"] += 1
+        return True
+    tally["checked"] += 1
+    score = raw_overlap(q["text"], paths)
+    if score >= FUZZY_MIN:
+        return True
+    notes.append(f"{where} 书外全文里对不上「{q['text']}」（字符重合最高 {score:.0%}）")
+    return False
+
+
+# 「书中提及」：纲目和列传里写到这个词或别名的地方
+
+
+def plain_md(s: str) -> str:
+    s = re.sub(r"\[\[[^\]|]+\|([^\]]*)\]\]", r"\1", s)
+    return re.sub(r"\[\[([^\]]+)\]\]", r"\1", s).replace("**", "")
+
+
+def mention_docs(entries: list[Entry], liezhuan: list[dict]) -> list[dict]:
+    docs = []
+    for e in sorted((e for e in entries if not e.cunmu), key=chrono):
+        docs.append({"kind": "annals", "id": e.anchor, "when": e.when(),
+                     "gang": " ".join(plain_md(g["gang"]) for g in e.groups),
+                     "body": " ".join(plain_md(m) for g in e.groups for m in g["mu"])})
+    for z in liezhuan:
+        docs.append({"kind": "zhuan", "name": z["name"], "when": f"{z['name']}传", "gang": "",
+                     "body": " ".join(plain_md(p) for p in z["summary"])})
+    return docs
+
+
+def count_mentions(terms: list[str], docs: list[dict]) -> dict | None:
+    """{total, annals, zhuan, items}。纲里写到的优先，其次写得多的；选出来的按时间排。单字的词太容易误配，不算。"""
+    terms = sorted({t for t in terms if len(t) >= 2}, key=len, reverse=True)
+    if not terms:
+        return None
+    rx = re.compile("|".join(re.escape(t) for t in terms))
+    hits = []
+    for i, d in enumerate(docs):
+        in_gang = rx.search(d["gang"])
+        m = in_gang or rx.search(d["body"])
+        if m:
+            n = len(rx.findall(d["gang"])) + len(rx.findall(d["body"]))
+            hits.append((i, bool(in_gang), n, d["gang"] if in_gang else d["body"], m))
+
+    def top(kind: str, limit: int) -> list[tuple]:
+        found = [h for h in hits if docs[h[0]]["kind"] == kind]
+        return sorted(sorted(found, key=lambda h: (not h[1], -h[2], h[0]))[:limit])
+
+    items = []
+    for i, _, _, src, m in top("annals", MENTION_ANNALS) + top("zhuan", MENTION_ZHUAN):
+        d, (a, b) = docs[i], m.span()
+        items.append({"kind": d["kind"], "ref": d["id"] if d["kind"] == "annals" else d["name"], "when": d["when"],
+                      "pre": ("…" if a > 24 else "") + src[max(0, a - 24):a], "hit": m[0],
+                      "post": src[b:b + 36] + ("…" if len(src) > b + 36 else "")})
+    n_annals = sum(docs[h[0]]["kind"] == "annals" for h in hits)
+    return {"total": len(hits), "annals": n_annals, "zhuan": len(hits) - n_annals, "items": items}
+
+
+def export_wu(items: list[Wu], entries: list[Entry], liezhuan: list[dict]) -> dict:
+    """site/data/bowu.json。只有编者文字和条目里写的短引，公开版照常带上。"""
+    P, extra = powers(), power_match()
+    docs = mention_docs(entries, liezhuan)
+    power_terms = lambda pid: [P[pid]["name"], *extra.get(P[pid]["name"], [])]
+    out = []
+    for w in items:
+        terms = [w.name, *w.aliases, *(t for pid in w.main for t in power_terms(pid))]
+        out.append({"name": w.name, "men": w.men, "aliases": w.aliases, "powers": w.powers, "main": w.main,
+                    "parent": w.parent, "blocks": w.fields, "see": w.see, "kaoyi": w.kaoyi,
+                    "mentions": count_mentions(terms, docs)})
+    owners = {pid: w.name for w in items for pid in w.main}
+    power_pages = {}
+    for pid in P:
+        page = {"entry": owners.get(pid), "related": [w.name for w in items if pid in w.powers and pid not in w.main]}
+        if pid not in owners:
+            page["mentions"] = count_mentions(power_terms(pid), docs)
+        power_pages[pid] = page
+    return {"men": MEN, "entries": out, "powers": power_pages}
+
+
+def check_wu(path: Path) -> int:
+    """检查博物志的一个文件。别的文件一起读进来，只为核对跨条目的引用，它们自己的问题不在这里报。"""
+    probs, notes = Problems(), []
+    mine = parse_wu(path, probs, notes)
+    others = [w for p in sorted(WU_DIR.glob("*.md")) if p.resolve() != path for w in parse_wu(p, Problems(), [])]
+    link_probs, link_notes = Problems(), []
+    link_wu(mine + others, link_probs, link_notes)
+    prefix = f"{path.name}:"
+    probs += [p for p in link_probs if p.startswith(prefix)]
+    notes += [n for n in link_notes if n.startswith(prefix)]
+    tally: Counter = Counter()
+    for w in mine:
+        prose = sum(len(re.sub(r"\s", "", t)) for _, t in w.texts())
+        quotes = sum(not isinstance(t, str) for b in w.fields.values() for t in b)
+        tag = (f" 别:{','.join(w.aliases)}" if w.aliases else "") + (f" 关:{','.join(w.powers)}" if w.powers else "") \
+            + (f" 上:{w.parent}" if w.parent else "") + (f" 是{'、'.join(powers()[p]['name'] for p in w.main)}的页面" if w.main else "")
+        print(f"  {w.name}  门:{w.men}{tag}  撰文 {prose} 字，引文 {quotes} 段")
+        if not any(w.see.values()) and not quotes:
+            notes.append(f"{w.where} 「{w.name}」：没有出处（【见】或引文）")
+        for where, q in w.ext:
+            verify_ext(q, where, notes, tally)
+    print(f"{len(mine)} 条")
+    if tally:
+        print(f"书外短引 {tally['checked'] + tally['skipped']} 处：模糊比对 {tally['checked']} 处，"
+              f"{tally['skipped']} 处全文文件还没有，跳过")
+    for p in probs:
+        print("  !", p)
+    for n in notes:
+        print("  ~", n)
+    return 1 if probs else 0
+
+
 # ---------------------------------------------------------------- 导出
 
 
@@ -859,6 +1327,8 @@ def build(quiet: bool = False) -> int:
             probs.add(str(year), f"还没写的事件 {len(missing)} 条：{'、'.join(missing)}")
     liezhuan = load_liezhuan(probs)
     renwu = load_renwu(probs)
+    wu_notes: list[str] = []
+    wu_items = load_wu(probs, wu_notes)
     no_intro: list[str] = []
     titles, names = {b["title"] for b in benmo}, {z["name"] for z in liezhuan}
     for e in all_entries:
@@ -949,8 +1419,16 @@ def build(quiet: bool = False) -> int:
     if not quiet and (orphans or implicit):
         print(f"  ~ 归属：立条而无归属 {len(orphans)} 条，只靠故事线自动归入（未确认）{len(implicit)} 条，用 check 看具体条目")
     (SITE_DATA / "annals.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    (SITE_DATA / "bowu.json").write_text(json.dumps(export_wu(wu_items, all_entries, liezhuan), ensure_ascii=False),
+                                         encoding="utf-8")
     if not quiet:
-        print(f"已写出 {(SITE_DATA / 'annals.json').relative_to(ROOT)} 和 {OUT_DIR.relative_to(ROOT)}/")
+        by_men = Counter(w.men for w in wu_items)
+        print(f"博物志：{len(wu_items)} 条（{'、'.join(f'{m} {by_men[m]}' for m in MEN if by_men[m]) or '尚无条目'}），"
+              f"{len(powers())} 个地区势力中 {sum(len(w.main) for w in wu_items)} 个已成文")
+        if wu_notes:
+            print(f"  ~ 博物志：{len(wu_notes)} 处提示，用 check 看具体位置")
+        print(f"已写出 {(SITE_DATA / 'annals.json').relative_to(ROOT)}、{(SITE_DATA / 'bowu.json').relative_to(ROOT)} "
+              f"和 {OUT_DIR.relative_to(ROOT)}/")
     for p in probs:
         print("  !", p)
     return 1 if probs else 0
@@ -958,8 +1436,11 @@ def build(quiet: bool = False) -> int:
 
 def check(path: str) -> int:
     """检查一个稿件文件：格式、事件编号、引文、书法用词（~ 开头的是提示，不算错误）。"""
+    resolved = Path(path).resolve()
+    if resolved.parent == WU_DIR.resolve() or re.search(r"^@物", resolved.read_text(encoding="utf-8"), re.M):
+        return check_wu(resolved)
     probs = Problems()
-    entries = parse_entries(Path(path).resolve(), probs)
+    entries = parse_entries(resolved, probs)
     titles = {b["title"] for b in load_benmo(probs)}
     names = {z["name"] for z in load_liezhuan(probs)}
     for e in entries:
@@ -1104,8 +1585,11 @@ def rawfind(pattern: str, limit: int = 60):
 
 
 def verify_quotes(out_path: str | None = None):
-    """核对【目】【纲】【考异】里的「」短引：在全部剧本、档案、简介、年表、原始游戏文本里找得到才算数。"""
-    norm = lambda t: re.sub(r"[\s，。、！？：；,.!?:;“”\"‘’'「」『』《》（）()—\-…·]", "", t.replace("{@Nickname}", "博士"))
+    """核对【目】【纲】【考异】里的「」短引：在全部剧本、档案、简介、年表、原始游戏文本里找得到才算数。
+
+    博物志也查：正文和考异里的「」短引，游戏文本里找不到时，再到书外全文里模糊比对；@书、@影、@漫 只比对书外全文。
+    """
+    norm = norm_text
     corpus = []
     for sid in episode_index():
         corpus += [(ln[1] or "") + " " + line_text(ln) for ln in lines_of(sid) if ln[0] != "b"]
@@ -1120,6 +1604,7 @@ def verify_quotes(out_path: str | None = None):
     text = norm("\n".join(corpus))
     probs = Problems()
     bad, total = [], 0
+    raw_paths, tally = all_raw_files(), Counter()
     for y in volume_years():
         for e in load_volume(y, probs):
             for g in e.groups:
@@ -1131,10 +1616,24 @@ def verify_quotes(out_path: str | None = None):
                         if not pieces:
                             continue
                         total += 1
-                        if not all(x in text for x in pieces):
+                        # 游戏文本里找不到时，再到书外全文（OCR，有错字）里模糊比对
+                        if not all(x in text for x in pieces) and not (raw_paths and raw_overlap(q, raw_paths) >= FUZZY_MIN):
                             bad.append((y, e.where, e.anchor, name, q))
+    for w in load_wu(Problems(), []):
+        for name, t in w.texts():
+            for q in re.findall(r"「([^「」]{4,})」", t):
+                pieces = [x for x in (norm(p) for p in re.split(r"……|…", q)) if len(x) >= 3]
+                if not pieces:
+                    continue
+                total += 1
+                if not all(x in text for x in pieces) and not (raw_paths and raw_overlap(q, raw_paths) >= FUZZY_MIN):
+                    bad.append(("博物志", w.where, w.name, name, q))
+        for where, q in w.ext:
+            total += 1
+            if not verify_ext(q, where, [], tally):
+                bad.append(("博物志", where, w.name, "书外短引", q["text"]))
     lines = [f"{y}\t{w}\t{a}\t{n}\t{q}" for y, w, a, n, q in bad]
-    print(f"短引 {total} 处，找不到 {len(bad)} 处")
+    print(f"短引 {total} 处，找不到 {len(bad)} 处" + (f"；书外短引 {tally['skipped']} 处全文文件还没有，跳过" if tally["skipped"] else ""))
     if out_path:
         Path(out_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
     else:
