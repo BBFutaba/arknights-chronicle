@@ -67,7 +67,7 @@ function renderVolume(v) {
   content.innerHTML = `<div class="an-body">
     <div class="sub">刻舟录</div>
     <h1>${esc(v.title)}</h1>
-    <div class="sub">${st.entries} 条 · ${st.gang} 组纲目 · ${st.quotes} 段原文 · 撰文 ${st.prose.toLocaleString()} 字，引文 ${st.quote_chars.toLocaleString()} 字 · <a href="#/fanli">凡例</a></div>
+    <div class="sub">${st.entries} 条 · ${st.gang} 组纲目 · ${st.quotes} 段原文 · 撰文 ${st.prose.toLocaleString()} 字，引文 ${st.quote_chars.toLocaleString()} 字</div>
     ${controlsHtml()}
     ${v.sections.map((s) => `
       <section class="an-sec" id="${secId(v.year, s.label)}">

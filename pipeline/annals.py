@@ -19,7 +19,7 @@
         引干员档案里从「开头」到「结尾」的一段。
 
 月、日标题按 PRTS 年表的日期生成，条目按事件编号排序。纪事本末在 data/annals/纪事本末.md，
-凡例在 data/annals/凡例.md。build 把原文从 site/data 里取出，导出 site/data/annals.json
+鸣谢与协议在 data/annals/鸣谢与协议.md。build 把原文从 site/data 里取出，导出 site/data/annals.json
 （网页「编年」页用）和 annals/<年份>.md（含原文，不提交）。
 
 博物志在 data/annals/博物志/*.md，每条以一行 @物 开头，格式见 data/annals/博物志须知.md。build 导出
@@ -552,7 +552,7 @@ def parse_entries(path: Path, probs: Problems) -> list[Entry]:
             probs.add(e.where, f"{tag} 是存目，要在【考异】里写明不录的理由")
         if e.cunmu and (e.shi or e.zhuan):
             probs.add(e.where, f"{tag} 是存目，不能标归属")
-        # 只见于书外（设定集、影片、漫画）的事按凡例只书纲，所以补条也可以是附记，靠考异交代出处
+        # 只见于书外（设定集、影片、漫画）的事按写作规范只书纲，所以补条也可以是附记，靠考异交代出处
         if e.sup and not has_kaoyi:
             probs.add(e.where, f"{tag} 是补条，要有考异（写明日期依据）")
         if e.sup and e.main and not any(g["quotes"] for g in e.groups):
@@ -1343,9 +1343,9 @@ def entry_json(e: Entry, benmo_titles: list[str]) -> dict:
     }
 
 
-def fanli_lines() -> list[dict]:
-    """凡例分节导出：## 是小标题，- 是条目，其余是段落；开头的 # 标题不要。"""
-    path = SRC_DIR / "凡例.md"
+def xieyi_lines() -> list[dict]:
+    """鸣谢与协议分行导出：## 是小标题，- 是条目，其余是段落；开头的 # 标题不要。"""
+    path = SRC_DIR / "鸣谢与协议.md"
     if not path.exists():
         return []
     out = []
@@ -1435,7 +1435,7 @@ def build(quiet: bool = False) -> int:
         for e in es:
             belongs.setdefault(id(e), []).append(title)
 
-    data = {"fanli": fanli_lines(), "aliases": aliases(), "volumes": [], "benmo": [], "liezhuan": []}
+    data = {"xieyi": xieyi_lines(), "aliases": aliases(), "volumes": [], "benmo": [], "liezhuan": []}
     # 归属：立条必须是某件事的一环或某个人的一笔；只靠故事线自动归入的，算「未确认」
     orphans = [e for e in all_entries if e.main and not e.zhuan and id(e) not in belongs and e.merged != "不系年"]
     implicit = [e for e in all_entries if e.main and not e.shi and not e.zhuan and id(e) in belongs]
