@@ -73,7 +73,7 @@ pipeline/
   site.py          导出 site/data/*.json
   annals.py        编年史和博物志：查剧本、取引文、校验、导出
   publish.py       生成公开版网页（dist/），去掉剧本全文和干员档案正文
-  bundle.py        把本地版打包成一个 HTML 文件（刻舟录-完整版.html，只在本地用）
+  bundle.py        把网页打包成一个 HTML 文件：本地版（刻舟录-完整版.html，只在本地用）；加 --public 打包公开版（刻舟录-公开版.html，传到 GitHub Release）
   records.py       下载《泰拉记事》到 Raw Data/（经 PRTS，有间隔，遇 403/429 就停）
   comics.py        下载官方漫画到 Raw Data/
   ocr_gpu.py       书、影片、漫画、《泰拉记事》的 GPU OCR

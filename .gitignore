@@ -14,5 +14,7 @@ StoryText/
 /dist/
 # 单文件本地版，含剧本全文，由 python -m pipeline.bundle 生成，不要上传
 /*-完整版.html
+# 单文件公开版，由 python -m pipeline.bundle --public 生成，传到 GitHub Release，不进仓库
+/*-公开版.html
 # 用户放进来的素材（设定集等，版权属于原作者），只留本地，不要上传
 Raw Data/
