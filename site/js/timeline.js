@@ -29,7 +29,7 @@ export function mount(el, r) {
       <div class="tl-active"></div>
       <div class="tl-count muted"></div>
       <nav class="tl-eras"></nav>
-      <p class="muted small">↑↓ 键切换事件。日期为 PRTS 社区根据剧情推测，可能有偏差。</p>
+      <p class="muted small">↑↓ 键切换事件。日期为 PRTS 社区根据剧情推测，可能有偏差。标「补」的是 PRTS 年表没有、本书据原文补入的事，日期是本书所系。</p>
     </aside>
     <section class="tl-main"><div class="tl-scroll"><div class="tl-canvas"></div></div></section>
     <aside class="tl-detail panel"></aside>`;
@@ -93,6 +93,7 @@ function yearLabel(e) {
   return e.year < 0 ? `前 ${-e.year} 年` : `${e.year} 年`;
 }
 function shortWhen(e) {
+  if (e.sup) return e.when.replace(/^(泰拉历)?[〇一二三四五六七八九十百千]+年/, '').replace(/^（(.*)）$/, '$1') || '全年';
   if (e.year == null || e.year < 0) return e.when;
   const rest = e.when.startsWith(`${e.year} 年`) ? e.when.slice(`${e.year} 年`.length).trim() : e.when;
   return rest.replace(/^（(.*)）$/, '$1') || '全年';
@@ -175,7 +176,7 @@ function render() {
     const g = D.groupById[e.thread];
     const tag = e.thread === 'lore' ? '' : `<span class="tl-tag" style="--c:${threadColor(e.thread)}" title="${esc(t.name)}">${esc(g?.chapter != null ? g.label : t.name)}</span>`;
     const more = e.lines.length > 1 ? `<span class="muted"> +${e.lines.length - 1}</span>` : '';
-    const par = e.parallel ? '<span class="badge">平行</span>' : '';
+    const par = e.parallel ? '<span class="badge">平行</span>' : e.sup ? '<span class="badge">补</span>' : '';
     return `<div class="tl-row${e.id === selected ? ' sel' : ''}" data-ev="${e.id}" style="padding-left:${width + 8}px">
       <span class="when">${esc(shortWhen(e))}</span>${tag}${par}<span class="text">${esc(e.lines[0] ?? '')}${more}</span></div>`;
   }).join('');
