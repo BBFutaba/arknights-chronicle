@@ -69,9 +69,11 @@ export function threadChip(tid, linkTo = 'timeline') {
 
 export function eventItem(ev) {
   const more = ev.lines.length > 1 ? `<span class="muted">（共 ${ev.lines.length} 条）</span>` : '';
-  return `<a class="event-item" href="${href.event(ev.id)}">
-    <span class="when">${esc(ev.when)}</span>${threadChip(ev.thread)}
-    <span class="text">${esc(ev.lines[0] ?? '')}${more}</span></a>`;
+  // 故事线标签自己是链接，不能放进另一个链接里，浏览器会把外层拆开。
+  // 整行点进事件，靠 .text 上铺满整行的伪元素；标签浮在它上面，点标签去故事线。
+  return `<div class="event-item">
+    <span class="when">${esc(ev.when)}</span>${threadChip(ev.thread) || '<span></span>'}
+    <a class="text" href="${href.event(ev.id)}">${esc(ev.lines[0] ?? '')}${more}</a></div>`;
 }
 
 // 页头：压在内容区顶上的一条灰纸，和左栏标题块同一个语法，轨道接着左栏的走。

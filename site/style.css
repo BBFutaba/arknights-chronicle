@@ -543,7 +543,10 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .appear-group .chip { font-size: 12px; }
 
 /* 列表行：发丝线分行，悬停左边一道绿 */
-.event-item { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: baseline; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.event-item { position: relative; display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: baseline; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+/* 整行点进事件：链接的伪元素铺满整行，故事线标签浮在上面，点它去故事线 */
+.event-item > a.text::after { content: ""; position: absolute; inset: 0; }
+.event-item > .thread-chip { position: relative; z-index: 1; }
 .event-item:hover { background: var(--hover); color: var(--text); box-shadow: inset 3px 0 var(--lime); }
 .event-item .when { color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .bw-hit { background: var(--lime); color: var(--ink); padding: 0 2px; }
