@@ -855,7 +855,7 @@ def zhuan_index(probs: Problems, anchors: set[str], names: set[str], pattern: st
         if r["origin"] not in ORIGINS:
             probs.add(where, f"{name}：出身「{r['origin']}」要写 {'、'.join(ORIGINS)} 之一")
         if r["fate"] not in FATES:
-            probs.add(where, f"{name}：盖棺「{r['fate']}」要写 {'、'.join(FATES)} 之一")
+            probs.add(where, f"{name}：身后「{r['fate']}」要写 {'、'.join(FATES)} 之一")
         if r["ev"] and r["ev"] not in anchors:
             probs.add(where, f"{name}：条「{r['ev']}」不存在")
         if r["fate"] == "已" and not r["died"]:

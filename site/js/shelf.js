@@ -1,8 +1,8 @@
 // 书架：列传和纪事本末共用。左栏是搜索、索引和结果，右栏是索引页或单篇。
-// 筛选都写在地址里（#/zhuan?出身=乌萨斯&盖棺=已），可以收藏，也可以转发；点标签页回到不筛选的状态。
+// 筛选都写在地址里（#/zhuan?出身=乌萨斯&身后=已），可以收藏，也可以转发；点标签页回到不筛选的状态。
 // cfg：route、title、unit（篇/件）、placeholder、intro（索引页的说明）
 //      items()：[{ key, url, name, text（搜索用）, facets: {索引项: [值]}, line（索引页的一行身份）, tags（一行短标签）, n（条数）, sort: {排序名: 值} }]
-//      facets：[{ key, order?（固定顺序）, open? }]；groups：可选的分组；sorts：[排序名]，第一个是默认
+//      facets：[{ key, order?（固定顺序）, open?, was?（改名前的旧名，收藏过的旧链接还能用） }]；groups：可选的分组；sorts：[排序名]，第一个是默认
 //      resolve(key)：地址里的名字 → item；detail(item, el, params)：渲染单篇
 import { D } from './data.js';
 import { esc, pageHead } from './util.js';
@@ -23,10 +23,11 @@ export function makeShelf(cfg) {
   function readState(params) {
     state = freshState();
     state.q = params.get(OPTION_Q) ?? '';
-    state.group = cfg.groups.includes(params.get(OPTION_GROUP)) ? params.get(OPTION_GROUP) : cfg.groups[0];
+    const group = cfg.facets.find((f) => f.was && f.was === params.get(OPTION_GROUP))?.key ?? params.get(OPTION_GROUP);
+    state.group = cfg.groups.includes(group) ? group : cfg.groups[0];
     state.sort = cfg.sorts.includes(params.get(OPTION_SORT)) ? params.get(OPTION_SORT) : cfg.sorts[0];
     for (const f of cfg.facets) {
-      const vals = params.getAll(f.key);
+      const vals = [...params.getAll(f.key), ...(f.was ? params.getAll(f.was) : [])];
       if (vals.length) state.picks[f.key] = new Set(vals);
     }
   }
