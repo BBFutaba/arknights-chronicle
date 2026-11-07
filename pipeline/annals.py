@@ -1246,7 +1246,7 @@ def mention_docs(entries: list[Entry], liezhuan: list[dict]) -> list[dict]:
                      "body": " ".join(plain_md(m) for g in e.groups for m in g["mu"])})
     for z in liezhuan:
         docs.append({"kind": "zhuan", "name": z["name"], "when": f"{z['name']}传", "gang": "",
-                     "body": " ".join(plain_md(p) for p in z["summary"])})
+                     "body": "".join(plain_md(p) for p in z["summary"])})
     return docs
 
 

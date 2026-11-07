@@ -349,7 +349,8 @@ main.view-graph { background: var(--bg); color: var(--text); }
 .an-cunmu li { margin: 8px 0; }
 .an-cunmu .when { color: var(--muted); font-size: 12px; margin-right: 8px; }
 .an-cunmu strong { font-weight: 500; }
-.an-summary p { margin: 0 0 .5em; text-indent: 2em; line-height: 1.9; }
+.an-summary p { margin: 0 0 .85em; text-indent: 2em; line-height: 1.9; }
+.an-summary p:last-child { margin-bottom: 0; }
 .an-index ol { margin: 6px 0 0; padding-left: 1.6em; font-size: 13px; }
 .an-index li { margin: 3px 0; }
 .an-index .when { color: var(--muted); margin-right: 8px; font-size: 12px; }
