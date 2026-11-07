@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>刻舟录 · 明日方舟编年史</title>
+  <script>
+    // 没选过主题时跟随系统：系统是深色就用夜间
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('kz-theme'); } catch (e) {}
+      document.documentElement.dataset.theme = t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'mist');
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -24,12 +32,12 @@
       <input type="search" placeholder="搜索人物、博物志、事件、剧情…" autocomplete="off">
       <div class="search-results" hidden></div>
     </div>
-    <button class="about-btn" id="about-btn" title="关于数据来源">关于</button>
+    <div class="theme" id="theme"></div>
     <div class="track" id="track" aria-hidden="true"></div>
   </header>
   <main id="view"><div class="loading">正在加载数据…</div></main>
   <footer class="capbar">
-    同人整理，非官方 · 明日方舟编年史 · 双叶 撰 · <a href="https://github.com/BBFutaba/arknights-chronicle" target="_blank" rel="noopener">GitHub 仓库</a> · <a href="https://github.com/BBFutaba/arknights-chronicle/issues" target="_blank" rel="noopener">提 issue</a>
+    同人整理，非官方 · <span class="cap-wide">明日方舟编年史 · </span>双叶 撰 · <a href="https://github.com/BBFutaba/arknights-chronicle" target="_blank" rel="noopener">GitHub 仓库</a> · <a href="https://github.com/BBFutaba/arknights-chronicle/issues" target="_blank" rel="noopener">提 issue</a> · <button id="about-btn" title="关于数据来源">关于</button>
   </footer>
   <dialog id="about"></dialog>
   <script src="vendor/force-graph.min.js"></script>

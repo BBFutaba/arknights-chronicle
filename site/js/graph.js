@@ -24,7 +24,7 @@ let hover = null, selected = null, lastClick = { id: null, t: 0 };
 let palette = {}, fadeTimer = null, fitTimer = null, fitPending = false;
 
 const epCount = (c) => c.appear.reduce((n, [, sids]) => n + sids.length, 0);
-// 颜色从关系图自己的平面上读：纸面和深色平面是两组值
+// 颜色从关系图自己的平面上读：纸面和内容平面是两组值
 const css = (v) => getComputedStyle(document.querySelector('.graph-main') ?? document.documentElement).getPropertyValue(v).trim();
 const nid = (x) => (typeof x === 'object' ? x.id : x);
 const clamp = (x) => Math.max(0, Math.min(1, x));
@@ -45,10 +45,10 @@ export function mount(el, r) {
       </details>
       <div class="actions"><button class="btn g-relayout">重新布局</button><button class="btn g-fit">适应窗口</button></div>
       <div class="legend">
-        <span><i class="lg lg-operator"></i>干员</span><span><i class="lg lg-npc"></i>NPC</span>
-        <span><i class="lg lg-doctor"></i>博士</span>
-        <span><i class="lg lg-region"></i>地区</span><span><i class="lg lg-faction"></i>势力</span>
-        <span><i class="lg lg-event"></i>事件</span>
+        <span class="lg lg-operator"><i></i>干员</span><span class="lg lg-npc"><i></i>NPC</span>
+        <span class="lg lg-doctor"><i></i>博士</span>
+        <span class="lg lg-region">地区</span><span class="lg lg-faction">势力</span>
+        <span class="lg lg-event"><b></b>事件</span>
       </div>
       <p class="muted small">连线越粗，共同出场的集数越多。拖动节点，相连的人物会跟着移动。悬停或点击节点只看它的关联，双击以它为中心。</p>
     </aside>
@@ -169,12 +169,23 @@ function collect() {
   return { nodes, links };
 }
 
+function readPalette() {
+  palette = {
+    paper: css('--paper'), paperFg: css('--paper-fg'), tagFg: css('--tag-fg'), ink: css('--ink'), lime: css('--lime'),
+    hair: css('--g-edge'), link: css('--g-link'), hot: css('--g-hot'), text: css('--text'), panel: css('--panel'),
+  };
+}
+
+// 画布不走 CSS，换主题后要重读一遍颜色再画
+export function retheme() {
+  if (!fg) return;
+  readPalette();
+  setFades();
+}
+
 function build() {
   if (!fg) return;
-  palette = {
-    paper: css('--paper'), ink: css('--ink'), lime: css('--lime'), hair: css('--hair'),
-    text: css('--text'), panel: css('--panel'),
-  };
+  readPalette();
   const { nodes: specs, links: linkSpecs } = collect();
 
   adj = new Map([...specs.keys()].map((id) => [id, new Set()]));
@@ -198,6 +209,10 @@ function build() {
     Object.assign(n, spec, {
       r: Math.max(4, Math.min(22, 2.5 + Math.sqrt(spec.size) * 1.7)),
     });
+    n.labelW ??= measureLabel(n.label);
+    const box = n.type === 'event' ? { w: n.r * 2, h: n.r * 2 } : tagBox(n, n.r * TAG_FS, true);
+    n.tagW = box.w / 2;
+    n.tagH = box.h / 2;
     n.fade ??= 1;
     if (fresh) {
       const nb = [...adj.get(id)].map((x) => cache.get(x)).find((x) => x && current.has(x));
@@ -234,6 +249,36 @@ function gravity() {
   const force = (alpha) => {
     const k = forces.center * alpha;
     for (const n of nodes) { n.vx -= n.x * k; n.vy -= n.y * k; }
+  };
+  force.initialize = (ns) => { nodes = ns; };
+  return force;
+}
+
+// 防重叠：节点是长条的名字框，按矩形算。先按 x 排序，隔得太远的不用比
+function collide() {
+  let nodes = [];
+  const force = () => {
+    const order = [...nodes].sort((p, q) => p.x - q.x);
+    const widest = order.reduce((m, n) => Math.max(m, n.tagW), 0);
+    for (let i = 0; i < order.length; i++) {
+      const a = order[i];
+      for (let j = i + 1; j < order.length; j++) {
+        const b = order[j];
+        if (b.x - a.x > a.tagW + widest + TAG_GAP) break;
+        const dx = b.x + b.vx - a.x - a.vx, dy = b.y + b.vy - a.y - a.vy;
+        const ox = a.tagW + b.tagW + TAG_GAP - Math.abs(dx);
+        const oy = a.tagH + b.tagH + TAG_GAP - Math.abs(dy);
+        if (ox <= 0 || oy <= 0) continue;
+        // 往重叠少的方向推，一个 tick 推开一部分，不然会抖
+        if (ox < oy) {
+          const s = (dx < 0 ? -1 : 1) * ox * 0.25;
+          a.vx -= s; b.vx += s;
+        } else {
+          const s = (dy < 0 ? -1 : 1) * oy * 0.25;
+          a.vy -= s; b.vy += s;
+        }
+      }
+    }
   };
   force.initialize = (ns) => { nodes = ns; };
   return force;
@@ -283,6 +328,7 @@ function initGraph() {
     });
   fg.d3Force('center', null);
   fg.d3Force('gravity', gravity());
+  fg.d3Force('collide', collide());
   const resize = () => fg?.width(box.clientWidth).height(box.clientHeight);
   ro = new ResizeObserver(resize);
   ro.observe(box);
@@ -325,44 +371,85 @@ function setFades() {
   fadeTimer = setTimeout(() => fg?.autoPauseRedraw(true), 700);
 }
 
-// 素材和介绍片一个语法：十字方块是人物，黑底标签是地区和势力，发丝线是连线，只有高亮用荧光绿。
+// 素材和介绍片一个语法：所有节点都是框起来的文字，人物的框头上多一个半身像。发丝线是连线，只有选中的节点用荧光绿。
 const FONT = '"Inter Tight", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+const BUST = new Path2D('M.5 .14a.19 .19 0 1 0 0 .38a.19 .19 0 1 0 0 -.38zM.13 .9c0 -.2 .17 -.32 .37 -.32s.37 .12 .37 .32z');
+const TAG_FS = 0.84;    // 字号 = 节点半径 × 这个数
+const TAG_GAP = 3;      // 框与框之间至少留这么宽
+const ruler = document.createElement('canvas').getContext('2d');
+
+// 名字量一次存下来（按 100px 字号），比每帧量省
+function measureLabel(label) {
+  ruler.font = `700 100px ${FONT}`;
+  return ruler.measureText(label).width;
+}
+
+// 给定字号的框有多大：人物的框头上多一个半身像方块；没写名字时人物只剩半身像，地区势力只剩小黑块
+function tagBox(n, fs, named) {
+  const person = n.type !== 'region' && n.type !== 'faction';
+  const h = fs / 0.62;
+  const face = person ? h : 0;
+  return { h, face, w: face + (named ? n.labelW * fs / 100 + h * 0.5 : person ? 0 : h) };
+}
 
 function drawNode(n, ctx, scale) {
   n.fade += ((n.target ?? 1) - n.fade) * 0.2;
   const hot = n === active() || (n === selected && n.emph);
   ctx.globalAlpha = n.fade;
-  if (n.type === 'region' || n.type === 'faction') {
-    drawPower(n, ctx, scale, hot);
-  } else {
-    if (n.type === 'event') drawEvent(n, ctx, scale, hot);
-    else drawCross(n, ctx, scale, hot);
+  if (n.type === 'event') {
+    drawEvent(n, ctx, scale, hot);
     drawLabel(n, ctx, scale, hot);
+  } else {
+    drawTag(n, ctx, scale, hot);
   }
   ctx.globalAlpha = 1;
 }
 
-// 人物：十字方块。干员实心，NPC 空心，博士黑底绿线，当前选中的整块荧光绿
-function drawCross(n, ctx, scale, hot) {
-  const { paper, ink, lime, hair, panel } = palette;
-  const [fill, edge, mark] = hot ? [lime, ink, ink]
-    : n.type === 'operator' ? [paper, ink, ink]
-      : n.type === 'doctor' ? [ink, lime, lime]
-        : [panel, hair, hair];
-  const s = n.r * 0.88;  // 方块比同半径的圆显大，收一点
-  ctx.fillStyle = fill;
-  ctx.fillRect(n.x - s, n.y - s, s * 2, s * 2);
+// 各类节点的颜色：框底、边、字，人物还有像的底色和像本身
+function tagColors(type, hot) {
+  const { paper, paperFg, tagFg, ink, lime, hair, panel, text } = palette;
+  if (hot) return { bg: lime, edge: ink, fg: ink, faceBg: ink, face: lime };
+  if (type === 'operator') return { bg: paper, edge: ink, fg: paperFg, faceBg: ink, face: tagFg };
+  if (type === 'doctor') return { bg: ink, edge: ink, fg: '#fff', faceBg: lime, face: ink };
+  if (type === 'region') return { bg: ink, edge: hair, fg: tagFg };
+  if (type === 'faction') return { bg: ink, edge: lime, fg: lime };
+  return { bg: panel, edge: hair, fg: text, faceBg: panel, face: hair };  // NPC 是空心的
+}
+
+// 框的大小随出场集数走；名字写在框里，缩得太小读不了时只留半身像（地区势力留一个小黑块）
+function drawTag(n, ctx, scale, hot) {
+  const person = n.type !== 'region' && n.type !== 'faction';
+  let fs = n.r * TAG_FS;
+  if (n.emph) fs = Math.max(fs, 12 / scale);
+  else if (!person && scale * n.r >= 6) fs = Math.max(fs, 11 / scale);
+  const named = fs * scale >= 7.5;
+  const { w, h, face } = tagBox(n, fs, named);
+  const x = n.x - w / 2, y = n.y - h / 2;
+  const c = tagColors(n.type, hot);
+  ctx.fillStyle = c.bg;
+  ctx.fillRect(x, y, w, h);
+  if (person) {
+    ctx.fillStyle = c.faceBg;
+    ctx.fillRect(x, y, h, h);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(h, h);
+    ctx.fillStyle = c.face;
+    ctx.fill(BUST);
+    ctx.restore();
+  }
   ctx.lineWidth = 1 / scale;
-  ctx.strokeStyle = edge;
-  ctx.strokeRect(n.x - s, n.y - s, s * 2, s * 2);
-  if (s * scale < 4) return;  // 屏幕上太小就不画十字了
-  const c = s * 0.56;
-  ctx.lineWidth = Math.max(1 / scale, s * 0.09);
-  ctx.strokeStyle = mark;
-  ctx.beginPath();
-  ctx.moveTo(n.x - c, n.y); ctx.lineTo(n.x + c, n.y);
-  ctx.moveTo(n.x, n.y - c); ctx.lineTo(n.x, n.y + c);
-  ctx.stroke();
+  ctx.strokeStyle = c.edge;
+  ctx.strokeRect(x, y, w, h);
+  if (named) {
+    ctx.font = `700 ${fs}px ${FONT}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = c.fg;
+    ctx.fillText(n.label, x + face + h * 0.25, n.y + 0.5 / scale);
+  }
+  n.hitW = w / 2 + 1 / scale;
+  n.hitH = h / 2 + 1 / scale;
 }
 
 function drawEvent(n, ctx, scale, hot) {
@@ -376,38 +463,7 @@ function drawEvent(n, ctx, scale, hot) {
   ctx.stroke();
 }
 
-// 地区和势力：黑底标签，字就写在标签里。缩得太小时退成一个小黑块，放大了再出字
-function drawPower(n, ctx, scale, hot) {
-  const { ink, lime, paper, hair } = palette;
-  const faction = n.type === 'faction';
-  const edge = hot ? ink : faction ? lime : hair;
-  if (!n.emph && scale * n.r < 6) {
-    const s = n.r * 0.88;
-    ctx.fillStyle = hot ? lime : ink;
-    ctx.fillRect(n.x - s, n.y - s, s * 2, s * 2);
-    ctx.lineWidth = 1 / scale;
-    ctx.strokeStyle = edge;
-    ctx.strokeRect(n.x - s, n.y - s, s * 2, s * 2);
-    n.hitW = n.hitH = s + 2 / scale;
-    return;
-  }
-  const fs = 12 / scale;
-  ctx.font = `700 ${fs}px ${FONT}`;
-  const w = ctx.measureText(n.label).width + 14 / scale, h = fs + 9 / scale;
-  ctx.fillStyle = hot ? lime : ink;
-  ctx.fillRect(n.x - w / 2, n.y - h / 2, w, h);
-  ctx.lineWidth = 1 / scale;
-  ctx.strokeStyle = edge;
-  ctx.strokeRect(n.x - w / 2, n.y - h / 2, w, h);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = hot ? ink : faction ? lime : paper;
-  ctx.fillText(n.label, n.x, n.y + 0.5 / scale);
-  n.hitW = w / 2;
-  n.hitH = h / 2;
-}
-
-// 人名：节点在屏幕上半径 7px 时开始浮现，13px 时完全显示；高亮的节点始终显示，并换成黑底标签
+// 事件的名字写在菱形下面：放大到一定程度才浮现，高亮时换成黑底标签
 function drawLabel(n, ctx, scale, hot) {
   const show = Math.max(clamp((scale * n.r - 7) / 6), n.emph ? 1 : 0) * n.fade;
   if (show <= 0.03) return;
@@ -435,8 +491,8 @@ function drawLabel(n, ctx, scale, hot) {
 
 function linkColor(l) {
   const fade = Math.min(l.source.fade ?? 1, l.target.fade ?? 1);
-  if (isHot(l)) return rgba(palette.lime, 0.9);
-  return l.kind === 'co' ? rgba(palette.paper, 0.24 * fade) : rgba(palette.hair, 0.5 * fade);
+  if (isHot(l)) return rgba(palette.hot, 0.9);
+  return l.kind === 'co' ? rgba(palette.link, 0.24 * fade) : rgba(palette.hair, 0.5 * fade);
 }
 
 // 连线每帧都要取颜色，几千条线反复拼字符串很慢；不透明度取到两位小数后缓存

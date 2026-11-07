@@ -4,6 +4,7 @@ import { D, loadAll } from './data.js';
 import { esc, href } from './util.js';
 import { initSearch } from './search.js';
 import { initStage, setStation } from './station.js';
+import { initTheme } from './theme.js';
 import * as timeline from './timeline.js';
 import * as story from './story.js';
 import * as chars from './chars.js';
@@ -83,6 +84,7 @@ try {
   initSearch();
   initAbout();
   initStage();
+  initTheme(() => VIEWS[current]?.retheme?.());
   window.addEventListener('hashchange', route);
   route();
 } catch (err) {

@@ -1,47 +1,108 @@
 @font-face { font-family: "Inter Tight"; src: url(fonts/InterTight.woff2) format("woff2"); font-weight: 100 900; font-display: swap; unicode-range: U+0020-007E, U+00A0-00FF; }
 @font-face { font-family: "KZ Chrome"; src: url(fonts/NotoSansSC-chrome.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
 
-/* 风格语法见 promo/TREATMENT.md：冷灰纸、近黑、唯一强调色荧光绿；黑边夹画面，界面是压在纸上的深色平面。 */
-:root, .ph, .an-quote, .bw-book, .bw-note, .ln.hl {
+/* 风格语法见 promo/TREATMENT.md：冷灰纸、近黑、唯一强调色荧光绿；黑边夹画面，内容是压在纸上的一块彩色平面。 */
+:root {
+  --ink: #0c0d0e;          /* 标签的底、荧光绿上的字：任何主题下都是深的 */
   --paper: #d3d4d2;
   --paper-2: #c4c5c3;
-  --ink: #0c0d0e;
+  --paper-fg: var(--ink);  /* 灰纸上的字和线：夜间主题下是浅的 */
+  --paper-muted: #4b4d4c;
+  --paper-line: #a2a4a2;
+  --paper-hover: #bdbebc;
+  --paper-on-accent: #fff;
+  --paper-cs: light;
   --lime: #c8f62e;
   --hair: #8b8d8b;
+  --bar: #000;
+  /* 五个主题的底色，要改颜色就改这里 */
+  --t-mist: #adbcc6;
+  --t-sage: #b3bfa9;
+  --t-lilac: #bab6d0;
+  --t-deep: #3f4a45;
+  --t-night: #343b47;
+  --plane: var(--t-mist);
+  --plane-edge: #4c5358;
+  --plane-fg: #f0f1ee;     /* 深色平面上的字，浅色平面不用 */
+  --rail-band: linear-gradient(#a7a9a7, #bcbebc 45%, #eceded 50%, #bcbebc 55%, #a7a9a7);
+  --rail-tick: #6d6f6d;
+  --rail-line: var(--ink);
+  --reg-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%23b4b5b3' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  --reg-plane: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%23909ba3' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  --pc-operator: #1d4f8c;
+  --pc-npc: #5b3d99;
+  --pc-doctor: #a8321a;
+  --pc-region: #1c6b43;
+  --pc-faction: #8f4c0f;
+  --bust: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Cpath d='M.5 .14a.19 .19 0 1 0 0 .38a.19 .19 0 1 0 0 -.38zM.13 .9c0 -.2 .17 -.32 .37 -.32s.37 .12 .37 .32z'/%3E%3C/svg%3E");
   --out-expo: cubic-bezier(.16, 1, .3, 1);
   --st-h: 167px;
   --f-body: "Inter Tight", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
   --f-chrome: "KZ Chrome", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   --f-num: "Inter Tight", system-ui, sans-serif;
+}
+[data-theme="sage"] { --plane: var(--t-sage); }
+[data-theme="lilac"] { --plane: var(--t-lilac); }
+[data-theme="deep"] { --plane: var(--t-deep); --plane-edge: #a7b1ab; --reg-plane: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%2356625c' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); }
+/* 夜间：灰纸、荧光绿、轨道一起压暗，底是带点蓝的石板色，不用纯黑 */
+[data-theme="night"] {
+  --ink: #12151a;
+  --paper: #454c58;
+  --paper-2: #3b4250;
+  --paper-fg: #dfe2e4;
+  --paper-muted: #bcc2c8;
+  --paper-line: #5f6673;
+  --paper-hover: #525a67;
+  --paper-on-accent: #12151a;
+  --paper-cs: dark;
+  --lime: #b7d65c;
+  --hair: #8b929c;
+  --bar: #1c2027;
+  --plane: var(--t-night);
+  --plane-edge: #98a0aa;
+  --plane-fg: #dfe2e4;
+  --rail-band: linear-gradient(#59606c, #656c78 45%, #7c838f 50%, #656c78 55%, #59606c);
+  --rail-tick: #8a919b;
+  --rail-line: #8a919b;
+  --reg-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%23596069' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  --reg-plane: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%234c5360' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  --pc-operator: #a5ccf5;
+  --pc-npc: #c9b3f0;
+  --pc-doctor: #f2a08c;
+  --pc-region: #8fdcb0;
+  --pc-faction: #f2bd80;
+}
 
-  /* 纸面 */
+/* 纸面：左栏、页头、引文卡片 */
+:root, .ph, .an-quote, .bw-book, .bw-note, .ln.hl {
   --bg: var(--paper);
   --panel: var(--paper);
   --panel-2: var(--paper-2);
-  --text: var(--ink);
-  --muted: #4b4d4c;
-  --line: #a2a4a2;
-  --accent: var(--ink);
-  --on-accent: #fff;
-  --accent-soft: rgb(12 13 14 / 12%);
+  --text: var(--paper-fg);
+  --muted: var(--paper-muted);
+  --line: var(--paper-line);
+  --accent: var(--paper-fg);
+  --on-accent: var(--paper-on-accent);
+  --accent-soft: color-mix(in srgb, var(--paper-fg) 12%, transparent);
   --act-bg: var(--ink);
   --act-fg: #fff;
-  --lore: #6d6f6d;
-  --sel: rgb(12 13 14 / 12%);
-  --hover: #bdbebc;
+  --lore: var(--rail-tick);
+  --sel: color-mix(in srgb, var(--paper-fg) 12%, transparent);
+  --hover: var(--paper-hover);
   --tag-bg: var(--ink);
   --tag-fg: #fff;
-  --c-operator: #1d4f8c;
-  --c-npc: #5b3d99;
-  --c-doctor: #a8321a;
-  --c-region: #1c6b43;
-  --c-faction: #8f4c0f;
+  --mark-edge: var(--paper-fg);
+  --c-operator: var(--pc-operator);
+  --c-npc: var(--pc-npc);
+  --c-doctor: var(--pc-doctor);
+  --c-region: var(--pc-region);
+  --c-faction: var(--pc-faction);
   --shadow: none;
-  color-scheme: light;
+  color-scheme: var(--paper-cs);
   scrollbar-color: var(--hair) transparent;
 }
-/* 界面平面：顶栏、底栏、内容区都是深色。关系图一站整屏转黑。 */
-.topbar, .capbar, .content, .tl-scroll, .tl-detail, .graph-main, .xieyi-page, .search-results, dialog, main.view-graph {
+/* 顶栏和底栏是黑边，自成一组 */
+.topbar, .capbar {
   --bg: #0c0d0e;
   --panel: #14161a;
   --panel-2: #1d2025;
@@ -50,24 +111,82 @@
   --line: #2d3137;
   --accent: var(--lime);
   --on-accent: var(--ink);
-  --accent-soft: rgb(200 246 46 / 14%);
-  --act-bg: rgb(200 246 46 / 16%);
-  --act-fg: #fff;
-  --lore: #6c727a;
-  --sel: rgb(200 246 46 / 16%);
+  --accent-soft: color-mix(in srgb, var(--lime) 14%, transparent);
   --hover: #23272d;
-  --tag-bg: #262a30;
-  --tag-fg: #eceded;
-  --c-operator: #6ea8e6;
-  --c-npc: #a98be0;
-  --c-doctor: #e0775e;
-  --c-region: #5fbf8a;
-  --c-faction: #e3994f;
   color-scheme: dark;
-  scrollbar-color: #3a3e45 transparent;
   color: var(--text);
 }
-.ph, .an-quote, .bw-book, .bw-note { color: var(--text); color-scheme: light; }
+/* 内容平面（浅色）：颜色都从 --plane 混出来。关系图读的 --g-* 要能解析成十六进制，不能写 color-mix */
+.content, .tl-scroll, .tl-detail, .graph-main, .xieyi-page, .search-results, dialog, main.view-graph {
+  --bg: color-mix(in srgb, var(--plane), var(--ink) 7%);
+  --panel: var(--plane);
+  --panel-2: color-mix(in srgb, var(--plane), #fff 22%);
+  --text: var(--ink);
+  --prose: #16191a;
+  --muted: color-mix(in srgb, var(--plane), var(--ink) 74%);
+  --line: color-mix(in srgb, var(--plane), var(--ink) 20%);
+  --accent: var(--ink);
+  --on-accent: #fff;
+  --accent-soft: color-mix(in srgb, var(--ink) 10%, transparent);
+  --act-bg: var(--ink);
+  --act-fg: #fff;
+  --lore: color-mix(in srgb, var(--plane), var(--ink) 50%);
+  --sel: color-mix(in srgb, var(--lime) 50%, transparent);
+  --hover: color-mix(in srgb, var(--plane), var(--ink) 9%);
+  --tag-bg: var(--ink);
+  --tag-fg: #fff;
+  --c-operator: #174479;
+  --c-npc: #4f3388;
+  --c-doctor: #7f2411;
+  --c-region: #125033;
+  --c-faction: #6f3a09;
+  --node-bg: var(--lime);
+  --node-hot: var(--ink);
+  --mark-edge: var(--ink);
+  --tick: color-mix(in srgb, var(--plane), var(--ink) 42%);
+  --band: color-mix(in srgb, var(--plane), var(--ink) 13%);
+  --g-bg: var(--plane);
+  --g-link: var(--ink);
+  --g-edge: var(--plane-edge);
+  --g-hot: var(--ink);
+  color-scheme: light;
+  scrollbar-color: color-mix(in srgb, var(--plane), var(--ink) 35%) transparent;
+  color: var(--text);
+}
+/* 内容平面（深色）：深灰绿和夜间。字变浅，荧光绿回到字和线上 */
+:is([data-theme="deep"], [data-theme="night"]) :is(.content, .tl-scroll, .tl-detail, .graph-main, .xieyi-page, .search-results, dialog, main.view-graph) {
+  --bg: color-mix(in srgb, var(--plane), var(--ink) 28%);
+  --panel-2: color-mix(in srgb, var(--plane), #fff 8%);
+  --text: var(--plane-fg);
+  --prose: color-mix(in srgb, var(--plane-fg) 92%, var(--plane));
+  --muted: color-mix(in srgb, var(--plane), #fff 62%);
+  --line: color-mix(in srgb, var(--plane), #fff 17%);
+  --accent: var(--lime);
+  --on-accent: var(--ink);
+  --accent-soft: color-mix(in srgb, var(--lime) 16%, transparent);
+  --act-bg: color-mix(in srgb, var(--lime) 18%, transparent);
+  --act-fg: var(--plane-fg);
+  --lore: color-mix(in srgb, var(--plane), #fff 32%);
+  --sel: color-mix(in srgb, var(--lime) 18%, transparent);
+  --hover: color-mix(in srgb, var(--plane), #fff 9%);
+  --tag-bg: color-mix(in srgb, var(--plane), var(--ink) 55%);
+  --tag-fg: var(--plane-fg);
+  --c-operator: #a5ccf5;
+  --c-npc: #c9b3f0;
+  --c-doctor: #f6b2a2;
+  --c-region: #8fdcb0;
+  --c-faction: #f2bd80;
+  --node-bg: var(--panel);
+  --node-hot: var(--lime);
+  --mark-edge: var(--lime);
+  --tick: color-mix(in srgb, var(--plane), #fff 25%);
+  --band: color-mix(in srgb, var(--plane), #fff 13%);
+  --g-link: #d3d4d2;
+  --g-hot: var(--lime);
+  color-scheme: dark;
+  scrollbar-color: color-mix(in srgb, var(--plane), #fff 22%) transparent;
+}
+.ph, .an-quote, .bw-book, .bw-note { color: var(--text); }
 ::selection { background: var(--lime); color: var(--ink); }
 
 * { box-sizing: border-box; }
@@ -95,7 +214,7 @@ input[type=search]:focus, select:focus { outline: 2px solid var(--accent-soft); 
 /* ---------------------------------------------------------------- 顶栏 */
 .topbar {
   position: relative; flex: none; display: flex; align-items: center; gap: 20px; padding: 0 24px 12px; height: 66px;
-  background: #000; z-index: 10;
+  background: var(--bar); z-index: 10;
 }
 .brand { font: 900 21px/1 var(--f-chrome); letter-spacing: .02em; color: #fff; white-space: nowrap; }
 .brand:hover { color: var(--lime); }
@@ -113,17 +232,24 @@ input[type=search]:focus, select:focus { outline: 2px solid var(--accent-soft); 
 .sr-item.active, .sr-item:hover { background: var(--hover); color: var(--text); }
 .sr-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sr-sub { font-size: 12px; color: var(--muted); white-space: nowrap; }
-.about-btn { flex: none; border: 1px solid var(--line); background: none; padding: 5px 10px; cursor: pointer; color: var(--muted); }
-.about-btn:hover { color: #fff; border-color: var(--hair); }
+/* 主题：一个按钮，点开是五种颜色 */
+.theme { position: relative; flex: none; }
+.theme-btn { display: flex; align-items: center; gap: 7px; height: 31px; padding: 0 10px; border: 1px solid var(--line); background: none; color: var(--muted); font: 500 13px/1 var(--f-chrome); white-space: nowrap; cursor: pointer; }
+.theme-btn:hover, .theme-btn[aria-expanded="true"] { color: #fff; border-color: var(--hair); }
+.theme-dot { flex: none; width: 13px; height: 13px; border: 1px solid rgb(255 255 255 / 55%); }
+.theme-menu { position: absolute; top: calc(100% + 6px); right: 0; width: 128px; padding: 4px; background: var(--bar); border: 1px solid var(--line); z-index: 20; }
+.theme-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; background: none; color: #e6e7e5; font: 500 13px/1 var(--f-chrome); text-align: left; cursor: pointer; }
+.theme-menu button:hover { background: var(--hover); }
+.theme-menu button[aria-selected="true"] { background: var(--lime); color: var(--ink); }
+.theme-menu button[aria-selected="true"] .theme-dot { border-color: var(--ink); }
 dialog { border: 0; border-top: 4px solid var(--lime); background: var(--panel); color: var(--text); max-width: 560px; padding: 20px 24px; }
 dialog::backdrop { background: rgb(0 0 0 / 35%); }
 dialog h2 { margin-bottom: 12px; }
-dialog a { color: var(--accent); }
 dialog button { margin-top: 8px; padding: 6px 16px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; }
 
 main {
   flex: 1; min-height: 0; display: flex;
-  background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%23b4b5b3' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background: var(--bg) var(--reg-paper);
 }
 main.view-graph { background: var(--bg); color: var(--text); }
 .panel { background: none; }
@@ -177,10 +303,8 @@ main.view-graph { background: var(--bg); color: var(--text); }
 .ev-tags { margin: 8px 0 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .ev-lines p { margin: 0 0 8px; line-height: 1.75; }
 .filter-links { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
-.filter-links a { color: var(--accent); }
 .sources { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .src-links { display: flex; flex-direction: column; margin-top: 4px; }
-.src-links a { color: var(--accent); }
 
 /* ---------------------------------------------------------------- 剧情 */
 .reader-nav { display: flex; justify-content: space-between; gap: 8px; margin: 16px 0; }
@@ -256,9 +380,14 @@ main.view-graph { background: var(--bg); color: var(--text); }
 .g-f-label { width: 4.5em; flex: none; color: var(--muted); }
 .g-f-v { width: 2.8em; text-align: right; font-weight: 500; font-size: 12px; }
 .graph-info { position: absolute; right: 12px; top: 12px; width: 280px; max-height: calc(100% - 24px); overflow: auto; padding: 14px; background: var(--panel-2); border: 1px solid var(--line); }
-.legend { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 5px; }
 .range-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.range-row input { flex: 1; accent-color: var(--accent); }
+.range-row input { flex: 1; min-width: 0; }
+input[type=range] { -webkit-appearance: none; appearance: none; height: 16px; margin: 0; background: none; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { height: 3px; background: var(--text); }
+input[type=range]::-moz-range-track { height: 3px; background: var(--text); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 15px; margin-top: -6px; background: var(--lime); border: 1px solid var(--mark-edge); }
+input[type=range]::-moz-range-thumb { width: 9px; height: 13px; border: 1px solid var(--mark-edge); background: var(--lime); }
 
 @media (max-width: 1100px) {
   .tl-detail { width: 300px; }
@@ -305,12 +434,14 @@ main.view-graph { background: var(--bg); color: var(--text); }
   background: repeating-linear-gradient(90deg, #3c3f42 0 1px, transparent 1px 24px) 0 0 / auto 6px repeat-x; }
 .track::after { content: ""; position: absolute; left: 0; right: 0; bottom: 3px; height: 1px; background: #3c3f42; }
 .track-fill { position: absolute; left: 0; bottom: 2px; height: 3px; background: var(--lime); z-index: 1; transition: width .55s var(--out-expo); }
-.track-stop { position: absolute; bottom: 0; width: 7px; height: 7px; margin-left: -3.5px; background: #000; border: 1px solid #6d6f6d; z-index: 1; }
+.track-stop { position: absolute; bottom: 0; width: 7px; height: 7px; margin-left: -3.5px; background: var(--bar); border: 1px solid #6d6f6d; z-index: 1; }
 .track-mark { bottom: -4px; margin-left: -7.5px; z-index: 2; transition: left .55s var(--out-expo); }
 
 /* 下黑边：署名和仓库 */
-.capbar { flex: none; height: 30px; padding: 0 24px; display: flex; align-items: center; gap: .35em; overflow: hidden; background: #000; white-space: nowrap; font: 500 11.5px/1 var(--f-chrome); letter-spacing: .02em; color: rgb(255 255 255 / 58%); }
+.capbar { flex: none; height: 30px; padding: 0 24px; overflow: hidden; background: var(--bar); white-space: nowrap; font: 500 11.5px/30px var(--f-chrome); letter-spacing: .02em; color: rgb(255 255 255 / 58%); }
 .capbar a { font: 600 11.5px/1 var(--f-num); color: rgb(255 255 255 / 78%); }
+.capbar button { padding: 0; border: 0; background: none; font: 500 11.5px/1 var(--f-chrome); letter-spacing: .02em; color: rgb(255 255 255 / 78%); cursor: pointer; }
+.capbar button:hover { color: var(--lime); }
 
 /* 左栏顶上的标题块：发丝线 + 方块帽 + 英文小注 + 中文大字 + 坐在轨道上的大数字 */
 .station { position: relative; flex: none; display: flex; flex-direction: column; padding-left: 14px; }
@@ -328,22 +459,23 @@ main.view-graph { background: var(--bg); color: var(--text); }
 .st-lines { margin-top: 10px; font-size: 13.5px; font-weight: 700; line-height: 1.75; }
 .st-lines p { margin: 0 0 6px; }
 .st-lines u { text-decoration: none; background: var(--ink); color: var(--lime); padding: 0 6px; }
-/* 轨道贯穿左栏，一头从屏幕边进来，一头钻到深色平面底下 */
+/* 轨道贯穿左栏，一头从屏幕边进来，一头接到页头的轨道上 */
 /* 第一站对着发丝线，第九站靠栏的右边；--i 是当前第几站（从 0 数） */
 .st-track { flex: none; position: relative; height: 21px; margin: auto -16px 0 -24px; --x0: 25px; --x1: 18px;
   --at: calc(var(--x0) + var(--i, 0) * (100% - var(--x0) - var(--x1)) / 8);
   background:
-    linear-gradient(#a7a9a7, #bcbebc 45%, #eceded 50%, #bcbebc 55%, #a7a9a7) 0 8px / 100% 7px no-repeat,
-    linear-gradient(var(--ink), var(--ink)) 0 18px / 100% 1px no-repeat; }
-.st-t { position: absolute; top: 3px; width: 1px; height: 4px; margin-left: -.5px; background: var(--st-tick, #6d6f6d);
+    var(--rail-band) 0 8px / 100% 7px no-repeat,
+    linear-gradient(var(--rail-line), var(--rail-line)) 0 18px / 100% 1px no-repeat; }
+.st-t { position: absolute; top: 3px; width: 1px; height: 4px; margin-left: -.5px; background: var(--st-tick, var(--rail-tick));
   left: calc(var(--x0) + var(--k) * (100% - var(--x0) - var(--x1)) / 16); }
 .st-t.major { top: 0; height: 7px; }
 .st-fill { position: absolute; left: 0; top: 9px; width: var(--at); height: 5px; background: var(--lime); transition: width .55s var(--out-expo); }
 .station .cross { left: calc(var(--at) - 7.5px); top: 4px; transition: left .55s var(--out-expo); }
-main.view-graph .st-track { --st-tick: #4a4e53;
-  background: linear-gradient(#2d3137, #2d3137) 0 8px / 100% 7px no-repeat; }
+main.view-graph .st-track { --st-tick: var(--tick);
+  background: linear-gradient(var(--band), var(--band)) 0 8px / 100% 7px no-repeat; }
 .station-rail { width: 360px; background: var(--lime); --text: var(--ink); --muted: #34361f; --st-tick: var(--ink); color: var(--ink); }
 .station-rail .st-title { font-size: 56px; }
+[data-theme="night"] .station-rail { background: var(--paper); --text: var(--paper-fg); --muted: var(--paper-muted); --st-tick: var(--rail-tick); color: var(--paper-fg); }
 
 @keyframes st-grow { from { transform: scaleY(0); } }
 @keyframes st-rise { from { transform: translateY(112%); } }
@@ -369,7 +501,7 @@ input::placeholder { color: var(--muted); opacity: .85; }
 
 /* 小标题：方块帽 + 中文粗 + 一根发丝线拉到头 */
 h4, .bw-part, .xieyi-body h2 { display: flex; align-items: center; gap: 9px; margin: 28px 0 10px; font-size: 14.5px; font-weight: 800; color: var(--text); letter-spacing: .01em; }
-h4::before, .bw-part::before, .xieyi-body h2::before { content: ""; flex: none; width: 8px; height: 8px; background: var(--lime); }
+h4::before, .bw-part::before, .xieyi-body h2::before { content: ""; flex: none; width: 9px; height: 9px; background: var(--lime); border: 1px solid var(--mark-edge); }
 h4::after, .bw-part::after, .xieyi-body h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
 /* 标签：底是实心的，左边一道颜色分类，数字是荧光绿，悬停整块变绿 */
@@ -386,17 +518,17 @@ h4::after, .bw-part::after, .xieyi-body h2::after { content: ""; flex: 1; height
 .an-tag { display: inline-block; font-size: 11px; line-height: 17px; padding: 0 5px; margin-right: 6px; background: var(--tag-bg); color: var(--tag-fg); vertical-align: 1px; }
 
 /* 按钮：发丝线框，悬停实心 */
-.btn { display: inline-block; padding: 5px 13px; border: 1px solid var(--hair); background: none; color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.5; cursor: pointer; }
-.btn:hover { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.btn { display: inline-block; padding: 5px 13px; border: 1px solid var(--accent); background: none; color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.5; cursor: pointer; }
+.btn:hover { background: var(--lime); border-color: var(--accent); color: var(--ink); }
 
 .note { font-size: 12px; color: var(--muted); border-left: 2px solid var(--lime); padding: 4px 10px; margin: 8px 0; }
 
 /* 折叠：十字方块，展开后变绿 */
 details > summary { list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--muted); padding: 4px 0; font-weight: 600; }
 details > summary::-webkit-details-marker { display: none; }
-details > summary::before { content: "+"; flex: none; width: 15px; height: 15px; border: 1px solid var(--hair); color: var(--text); font: 800 13px/13px var(--f-num); text-align: center; }
+details > summary::before { content: "+"; flex: none; width: 15px; height: 15px; border: 1px solid var(--accent); color: var(--text); font: 800 13px/13px var(--f-num); text-align: center; }
 details[open] > summary { color: var(--text); }
-details[open] > summary::before { content: "\2212"; background: var(--lime); border-color: var(--lime); color: var(--ink); }
+details[open] > summary::before { content: "\2212"; background: var(--lime); border-color: var(--accent); color: var(--ink); }
 
 /* 档案表：发丝线分行 */
 .kv { display: grid; grid-template-columns: max-content 1fr; font-size: 13.5px; border-bottom: 1px solid var(--line); }
@@ -413,30 +545,30 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .event-item .when { color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .bw-hit { background: var(--lime); color: var(--ink); padding: 0 2px; }
 
-/* ── 页头：压在深色平面顶上的灰纸，左边的竖线和下面的轨道都接着左栏 ─────────── */
+/* ── 页头：压在内容平面顶上的灰纸，左边的竖线和下面的轨道都接着左栏 ─────────── */
 .ph { display: flex; flex-direction: column; min-height: calc(var(--st-h) + 18px); margin: 0 -32px 24px; padding: 18px 32px 0;
-  background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%23b4b5b3' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); }
+  background: var(--paper) var(--reg-paper); }
 .ph-body { flex: 1; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 40px; }
 .ph-main { position: relative; align-self: stretch; flex: 1 1 340px; min-width: 0; padding: 0 0 8px 14px; }
-.ph-stem { position: absolute; left: 0; top: 2px; bottom: -8px; width: 2px; background: var(--ink); }
-.ph-cap { position: absolute; left: -5px; top: -3px; width: 12px; height: 12px; background: var(--ink); }
-.ph-back { display: block; margin-bottom: 4px; font-size: 12.5px; font-weight: 700; color: var(--ink); }
-.ph-back:hover { color: var(--ink); text-decoration: underline; }
+.ph-stem { position: absolute; left: 0; top: 2px; bottom: -8px; width: 2px; background: var(--text); }
+.ph-cap { position: absolute; left: -5px; top: -3px; width: 12px; height: 12px; background: var(--text); }
+.ph-back { display: block; margin-bottom: 4px; font-size: 12.5px; font-weight: 700; color: var(--text); }
+.ph-back:hover { color: var(--text); text-decoration: underline; }
 .ph-en { font: 800 12px/1 var(--f-num); letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ph h1 { margin: 4px 0 2px; font-size: 40px; font-weight: 900; line-height: 1.22; letter-spacing: -.005em; }
 .ph-sub { font-size: 13px; color: var(--muted); font-weight: 600; }
 .ph-sub a { text-decoration: underline; text-underline-offset: 3px; }
 .ph-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
 .ph-note { max-width: 62em; margin-top: 7px; font-size: 13px; line-height: 1.7; color: var(--muted); }
-.ph-note b { color: var(--ink); }
+.ph-note b { color: var(--text); }
 .ph-note a { text-decoration: underline; text-underline-offset: 3px; }
 .ph .shelf-chip { background: var(--ink); color: #fff; padding: 2px 9px; font-size: 12.5px; }
 .ph .shelf-chip:hover { background: var(--lime); color: var(--ink); }
 /* 数字列：每一列一根发丝线，从轨道升上来，顶上一个方块 */
 .ph-nums { display: flex; flex-wrap: wrap; gap: 10px 26px; padding-bottom: 8px; }
 .ph-num { position: relative; padding-left: 10px; align-self: flex-end; }
-.ph-num::before { content: ""; position: absolute; left: 0; top: 2px; bottom: -8px; width: 1px; background: var(--ink); }
-.ph-num::after { content: ""; position: absolute; left: -3px; top: 0; width: 7px; height: 7px; background: var(--ink); }
+.ph-num::before { content: ""; position: absolute; left: 0; top: 2px; bottom: -8px; width: 1px; background: var(--text); }
+.ph-num::after { content: ""; position: absolute; left: -3px; top: 0; width: 7px; height: 7px; background: var(--text); }
 .ph-num-l { display: block; font-size: 12.5px; font-weight: 800; line-height: 1; margin-bottom: 7px; white-space: nowrap; }
 .ph-num-v { display: flex; align-items: flex-end; gap: 5px; }
 .ph-num-v b { font: 800 44px/.82 var(--f-num); letter-spacing: -.04em; font-feature-settings: "tnum" 1; }
@@ -454,10 +586,10 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 /* 轨道和左栏的是同一根：同样高，同样的带子和刻度 */
 .ph-track { flex: none; height: 21px; margin: 0 -32px;
   background:
-    repeating-linear-gradient(90deg, #6d6f6d 0 1px, transparent 1px 30.4px) 0 0 / auto 7px repeat-x,
-    repeating-linear-gradient(90deg, #6d6f6d 0 1px, transparent 1px 15.2px) 0 3px / auto 4px repeat-x,
-    linear-gradient(#a7a9a7, #bcbebc 45%, #eceded 50%, #bcbebc 55%, #a7a9a7) 0 8px / 100% 7px no-repeat,
-    linear-gradient(var(--ink), var(--ink)) 0 18px / 100% 1px no-repeat; }
+    repeating-linear-gradient(90deg, var(--rail-tick) 0 1px, transparent 1px 30.4px) 0 0 / auto 7px repeat-x,
+    repeating-linear-gradient(90deg, var(--rail-tick) 0 1px, transparent 1px 15.2px) 0 3px / auto 4px repeat-x,
+    var(--rail-band) 0 8px / 100% 7px no-repeat,
+    linear-gradient(var(--rail-line), var(--rail-line)) 0 18px / 100% 1px no-repeat; }
 
 /* ── 编年史：一根竖轨接着页头的发丝线往下走，每条挂一个方块 ───────────────── */
 .an-body { max-width: 900px; }
@@ -471,23 +603,21 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .an-day { position: relative; margin: 20px 0 2px 16px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .an-entry { position: relative; padding: 12px 0 14px 16px; scroll-margin-top: 44px; }
 .an-entry::before { content: ""; position: absolute; left: .5px; top: 0; bottom: 0; width: 1px; background: var(--line); }
-.an-entry::after { content: ""; position: absolute; left: -4px; top: 19px; width: 10px; height: 10px; background: var(--panel); border: 1px solid var(--lime); }
-.an-entry:hover::after, .an-entry.flash::after { background: var(--lime); }
+.an-entry::after { content: ""; position: absolute; left: -4px; top: 19px; width: 10px; height: 10px; background: var(--node-bg); border: 1px solid var(--mark-edge); }
+.an-entry:hover::after, .an-entry.flash::after { background: var(--node-hot); }
 .an-group + .an-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .an-gang { font-size: 16px; line-height: 1.7; margin-bottom: 6px; }
 .an-gang strong { font-weight: 800; }
-.an-mu { font-size: 15px; line-height: 2; text-indent: 2em; margin: 6px 0; color: #d6d8d5; }
+.an-mu { font-size: 15px; line-height: 2; text-indent: 2em; margin: 6px 0; color: var(--prose); }
 /* 人名不再染色：只留一根发丝下划线，悬停变绿 */
-.an-p, .bw-link { color: inherit; text-decoration: underline; text-decoration-color: var(--hair); text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.an-p:hover, .bw-link:hover { color: var(--accent); text-decoration-color: currentColor; }
+.an-p, .bw-link, .an-meta a, .filter-links a, .src-links a, .xieyi-body a, dialog a { color: inherit; text-decoration: underline; text-decoration-color: var(--lore); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.an-p:hover, .bw-link:hover, .an-meta a:hover, .filter-links a:hover, .src-links a:hover, .xieyi-body a:hover, dialog a:hover { background: var(--lime); color: var(--ink); text-decoration-color: currentColor; }
 .an-people { margin: 8px 0; }
 .an-people .chip { font-size: 12px; }
 .an-intro { font-size: 12.5px; color: var(--muted); margin: 2px 0 8px; line-height: 1.8; }
 .an-when { display: inline-block; margin-bottom: 6px; padding: 1px 9px; background: var(--tag-bg); color: var(--lime); font-size: 12.5px; font-weight: 700; }
 .an-when a:hover { color: #fff; }
 .an-meta { font-size: 12px; color: var(--muted); margin-top: 8px; }
-.an-meta a { color: var(--accent); }
-.an-meta a:hover { text-decoration: underline; color: var(--accent); }
 .an-entry.minor { padding: 6px 0 8px 16px; }
 .an-entry.minor::after { top: 13px; left: -2px; width: 6px; height: 6px; border-color: var(--hair); }
 .an-entry.minor .an-gang { font-size: 13.5px; color: var(--muted); margin-bottom: 0; }
@@ -501,8 +631,8 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 
 /* 原文印在灰纸上：一字不改的东西和编者写的一眼分开。角上是裁切标 */
 .an-quote, .bw-book { position: relative; margin: 12px 0; padding: 12px 18px 10px; background: var(--paper); font-size: 13.5px; }
-.an-quote::before, .bw-book::before, .bw-note::before { content: ""; position: absolute; left: 5px; top: 5px; width: 8px; height: 8px; border-left: 1px solid var(--ink); border-top: 1px solid var(--ink); }
-.an-quote::after, .bw-book::after, .bw-note::after { content: ""; position: absolute; right: 5px; bottom: 5px; width: 8px; height: 8px; border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+.an-quote::before, .bw-book::before, .bw-note::before { content: ""; position: absolute; left: 5px; top: 5px; width: 8px; height: 8px; border-left: 1px solid var(--text); border-top: 1px solid var(--text); }
+.an-quote::after, .bw-book::after, .bw-note::after { content: ""; position: absolute; right: 5px; bottom: 5px; width: 8px; height: 8px; border-right: 1px solid var(--text); border-bottom: 1px solid var(--text); }
 .ql.s { color: var(--muted); font-size: 12.5px; font-weight: 700; }
 .ql.s::before, .ln.s::before, .ep-stamps::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; background: currentColor; vertical-align: 1px; }
 .an-quote cite { display: block; margin-top: 6px; text-align: right; font-style: normal; font-size: 12px; }
@@ -525,9 +655,9 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .an-body.shelf-index { max-width: none; }
 .shelf-groups > section { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); column-gap: 28px; }
 .shelf-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; margin: 22px 0 4px; padding: 0; font-size: 15px; font-weight: 800; }
-.shelf-head::before { content: ""; flex: none; width: 8px; height: 8px; background: var(--lime); }
+.shelf-head::before { content: ""; flex: none; width: 9px; height: 9px; background: var(--lime); border: 1px solid var(--mark-edge); }
 .shelf-head::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.shelf-head .n { order: 1; color: var(--lime); font: 800 15px/1 var(--f-num); }
+.shelf-head .n { order: 1; color: var(--accent); font: 800 15px/1 var(--f-num); }
 .shelf-head::after { order: 2; }
 .shelf-row { display: block; padding: 9px 8px 10px; border-bottom: 1px solid var(--line); color: inherit; }
 .shelf-row:hover { background: var(--hover); color: inherit; box-shadow: inset 3px 0 var(--lime); }
@@ -545,23 +675,23 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .ep-item .avg { color: var(--muted); font-size: 12px; display: block; }
 .ep-item .syn { color: var(--muted); font-size: 13px; line-height: 1.7; }
 .ln { padding: 3px 0; line-height: 1.8; }
-.ln.c { margin: 8px 0 8px calc(7.5em + 12px); padding: 8px 12px; border: 1px solid var(--lime); }
+.ln.c { margin: 8px 0 8px calc(7.5em + 12px); padding: 8px 12px; border: 1px solid var(--accent); }
 .ln.s { margin: 14px 0 6px calc(7.5em + 12px); font-size: 13px; font-weight: 700; color: var(--muted); }
-.ln.hl { background: var(--paper); color: var(--ink); box-shadow: -8px 0 0 var(--paper), 8px 0 0 var(--paper); }
+.ln.hl { background: var(--paper); color: var(--text); box-shadow: -8px 0 0 var(--paper), 8px 0 0 var(--paper); }
 
 /* ── 时间轴 ───────────────────────────────────────────────────────────── */
 .tl-svg .trunk { stroke: var(--lore); stroke-width: 1; }
 .tl-svg .seg { fill: none; stroke-width: 2; opacity: .9; }
 .tl-svg .dot { stroke: var(--panel); stroke-width: 1; }
 .tl-svg .dot.lore { stroke: var(--lore); stroke-width: 1.2; }
-.tl-svg .dot.sel { fill: var(--lime); stroke: var(--lime); stroke-width: 5; paint-order: stroke; }
+.tl-svg .dot.sel { fill: var(--lime); stroke: var(--accent); stroke-width: 2; }
 .tl-row, .tl-year { height: 34px; display: flex; align-items: center; gap: 8px; padding-right: 14px; white-space: nowrap; }
 .tl-row { cursor: pointer; }
 .tl-row:hover { background: var(--hover); }
-.tl-row.sel { background: var(--sel); box-shadow: inset 0 1px var(--lime), inset 0 -1px var(--lime); }
+.tl-row.sel { background: var(--sel); box-shadow: inset 0 1px var(--accent), inset 0 -1px var(--accent); }
 .tl-row .when { width: 104px; flex: none; color: var(--muted); font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-.tl-year { position: sticky; top: 0; z-index: 1; font-weight: 800; font-size: 13px; color: var(--lime); background: var(--bg); border-top: 1px solid var(--line);
-  background-image: repeating-linear-gradient(90deg, #33373c 0 1px, transparent 1px 15.2px); background-size: auto 4px; background-repeat: repeat-x; background-position: 0 100%; }
+.tl-year { position: sticky; top: 0; z-index: 1; font-weight: 800; font-size: 13px; color: var(--accent); background: var(--bg); border-top: 1px solid var(--line);
+  background-image: repeating-linear-gradient(90deg, var(--tick) 0 1px, transparent 1px 15.2px); background-size: auto 4px; background-repeat: repeat-x; background-position: 0 100%; }
 .ev-when { font-size: 22px; font-weight: 900; line-height: 1.3; }
 .sources li { padding: 8px 10px; background: var(--panel-2); }
 
@@ -569,36 +699,29 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .xieyi-body { max-width: 800px; margin: 0; padding: 26px 40px 36px; line-height: 1.85; }
 .xieyi-body h2 { margin-top: 30px; font-size: 16px; }
 .xieyi-body h2:first-of-type { margin-top: 0; }
-.xieyi-body a { color: var(--accent); }
 .xieyi-list { padding-left: 1.2em; list-style: square; }
 .xieyi-list li { margin: 6px 0; }
-.xieyi-list li::marker { color: var(--lime); }
+.xieyi-list li::marker { color: var(--accent); }
 .xieyi-foot { margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 
-/* ── 关系图：整屏转黑，轨道从左栏穿过去，节点压在上面 ─────────────────────── */
-.graph-main { --panel: #0c0d0e; }
-.graph-main::before { content: ""; position: absolute; left: 0; right: 0; top: 106px; height: 21px; pointer-events: none;
-  background:
-    repeating-linear-gradient(90deg, #3a3e43 0 1px, transparent 1px 30.4px) 0 0 / auto 7px repeat-x,
-    repeating-linear-gradient(90deg, #3a3e43 0 1px, transparent 1px 15.2px) 0 3px / auto 4px repeat-x,
-    linear-gradient(#2d3137, #2d3137) 0 8px / 100% 7px no-repeat; }
-#fg { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%232a2d31' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); }
+/* ── 关系图：没有页头，轨道停在左栏边上 ─────────────────────────────────── */
+.graph-main { --panel: var(--g-bg); }
+#fg { background: var(--reg-plane); }
 main.view-graph .station { height: 109px; }
 main.view-graph .st-track { margin-top: auto; }
 .g-min-row { white-space: nowrap; }
 .graph-info h3 { font-size: 20px; font-weight: 900; margin-bottom: 2px; }
-.legend { gap: 6px; }
-.legend span { display: flex; align-items: center; gap: 8px; }
-.lg { position: relative; flex: none; display: block; width: 13px; height: 13px; border: 1px solid var(--hair); background: var(--panel); }
-.lg-operator, .lg-npc, .lg-doctor { --m: var(--hair); }
-.lg-operator { background: var(--paper); border-color: var(--ink); --m: var(--ink); }
-.lg-doctor { background: var(--ink); border-color: var(--lime); --m: var(--lime); }
-.lg-operator::before, .lg-operator::after, .lg-npc::before, .lg-npc::after, .lg-doctor::before, .lg-doctor::after { content: ""; position: absolute; background: var(--m); }
-.lg-operator::before, .lg-npc::before, .lg-doctor::before { left: 5px; top: 2px; width: 1px; height: 7px; }
-.lg-operator::after, .lg-npc::after, .lg-doctor::after { left: 2px; top: 5px; width: 7px; height: 1px; }
-.lg-region, .lg-faction { width: 22px; height: 12px; background: var(--ink); }
-.lg-faction { border-color: var(--lime); }
-.lg-event { width: 10px; height: 10px; margin: 0 2px; transform: rotate(45deg); }
+/* 图例就是节点本身：半身像加名字的框，和地区势力的标签放在一起 */
+.lg { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid var(--ink); font-size: 12px; font-weight: 700; line-height: 1; white-space: nowrap; }
+.lg i { position: relative; flex: none; width: 20px; height: 20px; margin: 0 6px 0 -8px; background: var(--lg-face-bg); }
+.lg i::after { content: ""; position: absolute; inset: 0; background: var(--lg-face); -webkit-mask: var(--bust) center / 100% no-repeat; mask: var(--bust) center / 100% no-repeat; }
+.lg-operator { background: var(--paper); color: var(--paper-fg); --lg-face-bg: var(--ink); --lg-face: var(--tag-fg); }
+.lg-npc { background: var(--panel); border-color: var(--g-edge); color: var(--text); --lg-face-bg: transparent; --lg-face: var(--g-edge); }
+.lg-doctor { background: var(--ink); color: #fff; --lg-face-bg: var(--lime); --lg-face: var(--ink); }
+.lg-region { background: var(--ink); border-color: var(--g-edge); color: var(--tag-fg); }
+.lg-faction { background: var(--ink); color: var(--lime); border-color: var(--lime); }
+.lg-event { padding: 0; border: 0; gap: 7px; color: var(--text); }
+.lg-event b { width: 10px; height: 10px; margin: 0 3px; background: var(--panel); border: 1px solid var(--g-edge); transform: rotate(45deg); }
 
 @media (max-width: 1240px) {
   .ph-num-v b { font-size: 34px; }
@@ -621,4 +744,6 @@ main.view-graph .st-track { margin-top: auto; }
   .men-tiles { grid-template-columns: repeat(4, 1fr); width: 100%; }
   .shelf-groups > section { grid-template-columns: 1fr; }
   .xieyi-body { padding: 18px 16px 28px; }
+  .capbar { padding: 0 12px; }
+  .cap-wide { display: none; }
 }

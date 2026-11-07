@@ -16,7 +16,7 @@ from fontTools import subset
 from fontTools.ttLib import TTFont
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCES = [ROOT / "site/index.html", ROOT / "site/js/station.js"]
+SOURCES = [ROOT / "site/index.html", ROOT / "site/js/station.js", ROOT / "site/js/theme.js"]
 OUT = ROOT / "site/fonts/NotoSansSC-chrome.woff2"
 
 
