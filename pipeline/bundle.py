@@ -22,12 +22,12 @@ import sys
 from pathlib import Path
 
 from . import publish
-from .config import ROOT
+from .config import ROOT, VERSION
 
 SITE = ROOT / "site"
 DIST = ROOT / "dist"
-OUT = ROOT / "刻舟录-完整版.html"
-OUT_PUBLIC = ROOT / "刻舟录-公开版.html"
+OUT = ROOT / f"刻舟录-{VERSION}.html"            # 本地版，含剧本全文，不要上传
+OUT_PUBLIC = ROOT / f"刻舟录-O{VERSION}.html"    # 发行版
 
 IMPORT_NAMED = re.compile(r"^import\s+\{([^}]*)\}\s+from\s+'\./([\w.]+)';?[ \t]*$", re.M)
 IMPORT_STAR = re.compile(r"^import\s+\*\s+as\s+(\w+)\s+from\s+'\./([\w.]+)';?[ \t]*$", re.M)

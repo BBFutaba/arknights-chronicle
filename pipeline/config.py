@@ -3,6 +3,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# 版本号。发行版（公开）的 tag 和文件名是 O<版本号>，本地版（含剧本全文）的文件名是 <版本号>。
+# 发版前由用户定，改这里再提交。
+VERSION = "1.1"
+
 RAW_REPO = ROOT / "data" / "raw" / "ArknightsGameData"
 GAMEDATA = RAW_REPO / "zh_CN" / "gamedata"
 EXCEL = GAMEDATA / "excel"

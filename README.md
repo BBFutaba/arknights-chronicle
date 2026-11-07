@@ -47,11 +47,11 @@ python -m pipeline.check     # 年表出处对应情况、网页数据引用检�
 
 ### 公开版
 
-本地版（`site/`）和 `刻舟录-完整版.html` 含剧本全文，**只在本地使用，不要公开发布**。
+本地版（`site/`）和 `刻舟录-x.x.html` 含剧本全文，**只在本地使用，不要公开发布**。
 
 ```bash
 python -m pipeline.publish          # 生成公开版到 dist/，去掉剧本全文和干员档案正文
-python -m pipeline.bundle --public  # 打成单文件 刻舟录-公开版.html
+python -m pipeline.bundle --public  # 打成单文件 刻舟录-Ox.x.html
 python -m pipeline.deploy           # 发布当前提交：推送 main，更新 gh-pages 和 GitHub Release
 ```
 
