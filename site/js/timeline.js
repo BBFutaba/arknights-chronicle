@@ -7,9 +7,11 @@ import { esc, href, threadColor, threadChip, charChip, powerChip, epLabel, group
 
 const ROW = 34;
 const GAP = 16;
-const PAD = 12;
+const PAD = 12;      // 主世界线（纵轴）的 x
+const AXIS = 21;     // 横轴的高度
 
-let root, scroller, canvas, detail;
+let root, scroller, canvas, detail, xaxis;
+let locate = null;   // 事件 id → 它在画布上的 { x, y }
 let items = [];      // 当前显示的行：{ year } 或 { ev }
 let rowOf = {};      // 事件 id → 行号
 let visible = [];    // 当前筛选后的事件，用于上一条/下一条
@@ -32,11 +34,14 @@ export function mount(el, r) {
       <nav class="tl-eras"></nav>
       <p class="muted small">↑↓ 键切换事件。次序、日期和文字以本书编年史为准，PRTS 年表只作参考，见详情。</p>
     </aside>
-    <section class="tl-main"><div class="tl-scroll"><div class="tl-head"></div><div class="tl-canvas"></div></div></section>
+    <section class="tl-main"><div class="tl-scroll"><div class="tl-head"></div>
+      <div class="tl-xaxis"><i class="tl-axis-fill"></i><i class="cross tl-origin"></i><i class="cross on tl-axis-mark"></i></div>
+      <div class="tl-canvas"></div></div></section>
     <aside class="tl-detail panel"></aside>`;
   scroller = el.querySelector('.tl-scroll');
   canvas = el.querySelector('.tl-canvas');
   detail = el.querySelector('.tl-detail');
+  xaxis = el.querySelector('.tl-xaxis');
 
   const q = el.querySelector('.tl-q');
   q.value = state.q;
@@ -53,7 +58,7 @@ export function mount(el, r) {
   });
   el.querySelector('.tl-eras').addEventListener('click', (e) => {
     const a = e.target.closest('[data-row]');
-    if (a) scroller.scrollTo({ top: headHeight() + Number(a.dataset.row) * ROW, behavior: 'smooth' });
+    if (a) scroller.scrollTo({ top: headHeight() + Number(a.dataset.row) * ROW, behavior: 'smooth' });  // 这一行正好贴在吸顶的横轴下面
   });
   document.addEventListener('keydown', onKey);
   lastFilterKey = null;
@@ -141,13 +146,15 @@ function render() {
     items.push({ ev: e });
   }
   const { segs, lanes } = layout();
-  const laneW = Math.max(6, Math.min(13, 240 / Math.max(lanes, 1)));
+  const laneW = Math.max(6, Math.min(13, Math.floor(240 / Math.max(lanes, 1))));  // 取整，横轴的刻度才对得上每条线
+  xaxis.style.setProperty('--lane', `${laneW}px`);
   const x = (l) => PAD + l * laneW;
   const y = (r) => r * ROW + ROW / 2;
   const width = x(lanes - 1) + PAD + 4;
   const height = items.length * ROW;
   const laneOfRow = {};
   for (const s of segs) for (const r of s.rows) laneOfRow[r] = s.lane;
+  locate = (id) => ({ x: x(laneOfRow[rowOf[id]] ?? 0), y: y(rowOf[id]) });
 
   const paths = segs.map((s) => {
     const x0 = x(0), xl = x(s.lane), y0 = y(s.start), y1 = y(s.end);
@@ -165,7 +172,7 @@ function render() {
   }).join('');
 
   const rows = items.map((it) => {
-    if (!it.ev) return `<div class="tl-year" style="padding-left:${width + 8}px">${esc(it.year)}</div>`;
+    if (!it.ev) return `<div class="tl-year" style="padding-left:${width + 8}px;--w:${width}px">${esc(it.year)}</div>`;
     const e = it.ev;
     const t = D.threads[e.thread];
     const g = D.groupById[e.thread];
@@ -177,11 +184,26 @@ function render() {
   }).join('');
 
   canvas.style.height = `${height}px`;
-  canvas.innerHTML = `<svg class="tl-svg" width="${width}" height="${height}">
+  canvas.innerHTML = `<div class="tl-yaxis"><i class="tl-axis-fill"></i><i class="cross on tl-axis-mark"></i></div>
+    <svg class="tl-svg" width="${width}" height="${height}">
       <line class="trunk" x1="${x(0)}" y1="0" x2="${x(0)}" y2="${height}"/>${paths}${dots}</svg>
     <div class="tl-rows">${rows}</div>`;
 
   renderSide(lanes);
+  placeMarks();
+}
+
+// 两根轴张成坐标系：纵轴是时间，一个长刻度一行事件；横轴是故事线，一个刻度一条线。
+// 选中的事件把它的坐标标在两根轴上。
+function placeMarks() {
+  const yaxis = canvas.querySelector('.tl-yaxis');
+  const on = !!selected && rowOf[selected] != null;
+  xaxis.classList.toggle('on', on);
+  yaxis.classList.toggle('on', on);
+  if (!on) return;
+  const { x, y } = locate(selected);
+  xaxis.style.setProperty('--at', `${Math.round(x)}px`);
+  yaxis.style.setProperty('--at', `${Math.round(y)}px`);
 }
 
 function renderSide(lanes) {
@@ -214,6 +236,7 @@ function renderSide(lanes) {
   root.querySelector('.tl-head').innerHTML = pageHead({
     en: state.char || state.power || state.thread ? 'FILTERED' : 'ALL EVENTS',
     title,
+    rail: false,
     nums: [
       ['显示', visible.length, '条', 'SHOWN'], ['全部', D.events.length, '条', 'TOTAL'],
       ['并行', Math.max(lanes - 1, 0), '线', 'THREADS'], ['时代', eras.length, '段', 'ERAS'],
@@ -236,6 +259,7 @@ function select(id, scroll) {
     selected = null;
     detail.innerHTML = `<div class="muted pad">点击左侧事件查看详情。<br><br>
       颜色代表故事线（剧情组），灰色空心方块是只有设定资料出处的事件。</div>`;
+    placeMarks();
     return;
   }
   selected = ev.id;
@@ -246,8 +270,9 @@ function select(id, scroll) {
   }
   canvas.querySelectorAll(`[data-ev="${ev.id}"]`).forEach((n) => n.classList.add('sel'));
   if (scroll && rowOf[ev.id] != null) {
-    scroller.scrollTop = headHeight() + rowOf[ev.id] * ROW - scroller.clientHeight / 3;
+    scroller.scrollTop = headHeight() + AXIS + rowOf[ev.id] * ROW - scroller.clientHeight / 3;
   }
+  placeMarks();
   renderDetail(ev);
 }
 

@@ -25,6 +25,7 @@
   --plane-edge: #4c5358;
   --plane-fg: #f0f1ee;     /* 深色平面上的字，浅色平面不用 */
   --rail-band: linear-gradient(#a7a9a7, #bcbebc 45%, #eceded 50%, #bcbebc 55%, #a7a9a7);
+  --rail-band-v: linear-gradient(90deg, #a7a9a7, #bcbebc 45%, #eceded 50%, #bcbebc 55%, #a7a9a7);
   --rail-tick: #6d6f6d;
   --rail-line: var(--ink);
   --reg-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%23b4b5b3' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
@@ -62,6 +63,7 @@
   --plane-edge: #98a0aa;
   --plane-fg: #dfe2e4;
   --rail-band: linear-gradient(#59606c, #656c78 45%, #7c838f 50%, #656c78 55%, #59606c);
+  --rail-band-v: linear-gradient(90deg, #59606c, #656c78 45%, #7c838f 50%, #656c78 55%, #59606c);
   --rail-tick: #8a919b;
   --rail-line: #8a919b;
   --reg-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M114 120h12M120 114v12' stroke='%23596069' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
@@ -492,7 +494,7 @@ input::placeholder { color: var(--muted); opacity: .85; }
   .st-u em { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .track-fill, .track-mark, .st-fill, .station .cross { transition: none; }
+  .track-fill, .track-mark, .st-fill, .station .cross, .tl-axis-fill, .tl-axis-mark { transition: none; }
   .st-stem, .st-en, .st-title span, .st-u { animation: none; }
 }
 
@@ -583,7 +585,7 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .men-tile em { font: 800 8px/1 var(--f-num); font-style: normal; letter-spacing: .02em; opacity: .75; }
 .men-tile:hover { background: #2a2c2e; }
 .men-tile.hot, .men-tile.hot:hover { background: var(--lime); color: var(--ink); }
-.tl-head .ph { margin: 0; }
+.tl-head .ph { margin: 0; padding-left: 11px; }
 /* 轨道和左栏的是同一根：同样高，同样的带子和刻度 */
 .ph-track { flex: none; height: 21px; margin: 0 -32px;
   background:
@@ -688,11 +690,34 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .tl-svg .dot.sel { fill: var(--lime); stroke: var(--accent); stroke-width: 2; }
 .tl-row, .tl-year { height: 34px; display: flex; align-items: center; gap: 8px; padding-right: 14px; white-space: nowrap; }
 .tl-row { cursor: pointer; }
-.tl-row:hover { background: var(--hover); }
+.tl-row:hover { background: var(--accent-soft); }  /* 半透明：纵轴和故事线不能被悬停的行截断 */
 .tl-row.sel { background: var(--sel); box-shadow: inset 0 1px var(--accent), inset 0 -1px var(--accent); }
 .tl-row .when { width: 104px; flex: none; color: var(--muted); font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-.tl-year { position: sticky; top: 0; z-index: 1; font-weight: 800; font-size: 13px; color: var(--accent); background: var(--bg); border-top: 1px solid var(--line);
-  background-image: repeating-linear-gradient(90deg, var(--tick) 0 1px, transparent 1px 15.2px); background-size: auto 4px; background-repeat: repeat-x; background-position: 0 100%; }
+.tl-year { position: sticky; top: 21px; z-index: 1; font-weight: 800; font-size: 13px; color: var(--accent);
+  background: linear-gradient(90deg, transparent var(--w, 0), var(--bg) var(--w, 0)); }
+
+/* 坐标轴：两根轴张成坐标系。纵轴是时间，一个长刻度一行事件（行高 34）；横轴是故事线，一个刻度一条线。
+   原点在 x = 12，也是主世界线和页头竖线的位置 */
+.tl-xaxis { position: sticky; top: 0; z-index: 3; height: 21px;
+  background:
+    linear-gradient(90deg, var(--rail-tick) 1px, transparent 1px) 12px 0 / var(--lane, 13px) 7px repeat-x,
+    var(--rail-band) 0 8px / 100% 7px no-repeat,
+    linear-gradient(var(--rail-line), var(--rail-line)) 0 18px / 100% 1px no-repeat,
+    var(--paper); }
+.tl-yaxis { position: absolute; left: 0; top: 0; bottom: 0; width: 21px; pointer-events: none;
+  background:
+    linear-gradient(var(--tick) 1px, transparent 1px) 0 17px / 7px 34px repeat-y,
+    linear-gradient(var(--tick) 1px, transparent 1px) 3px 0 / 4px 34px repeat-y,
+    var(--rail-band-v) 8px 0 / 8px 100% no-repeat; }
+.tl-origin { left: 5px; top: 4px; }
+/* 选中事件的坐标：两根轴上各一个加号，荧光绿从原点走到那里 */
+.tl-axis-fill, .tl-axis-mark { display: none; }
+.tl-xaxis.on .tl-axis-fill, .tl-xaxis.on .tl-axis-mark, .tl-yaxis.on .tl-axis-fill, .tl-yaxis.on .tl-axis-mark { display: block; }
+.tl-axis-fill { position: absolute; background: var(--lime); }
+.tl-xaxis .tl-axis-fill { left: 12px; top: 9px; width: calc(var(--at, 12px) - 12px); height: 5px; transition: width .55s var(--out-expo); }
+.tl-yaxis .tl-axis-fill { left: 9px; top: 0; width: 6px; height: var(--at, 0); transition: height .55s var(--out-expo); }
+.tl-xaxis .tl-axis-mark { left: calc(var(--at, 12px) - 7px); top: 4px; z-index: 1; transition: left .55s var(--out-expo); }
+.tl-yaxis .tl-axis-mark { left: 5px; top: calc(var(--at, 0) - 7px); z-index: 2; transition: top .55s var(--out-expo); }
 .ev-when { font-size: 22px; font-weight: 900; line-height: 1.3; }
 .sources li { padding: 8px 10px; background: var(--panel-2); }
 

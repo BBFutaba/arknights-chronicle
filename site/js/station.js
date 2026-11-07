@@ -71,7 +71,9 @@ function placeTrack() {
 function alignHead() {
   const view = document.getElementById('view');
   const ph = view.querySelector('.ph');
-  if (ph) view.style.setProperty('--st-sync', `${ph.getBoundingClientRect().height - 18}px`);
+  // 时间轴的轨道不在页头里，紧贴在页头下面，要把它的 21px 算上
+  const rail = ph?.querySelector('.ph-track') ? 0 : 21;
+  if (ph) view.style.setProperty('--st-sync', `${ph.getBoundingClientRect().height + rail - 18}px`);
   else view.style.removeProperty('--st-sync');
 }
 

@@ -76,7 +76,8 @@ export function eventItem(ev) {
 
 // 页头：压在内容区顶上的一条灰纸，和左栏标题块同一个语法，轨道接着左栏的走。
 // nums 是 [标签, 数字, 单位, 英文单位] 的数组，空值跳过；aside 放在右边，代替数字列。
-export function pageHead({ en = '', title, back = null, sub = '', tags = '', note = '', nums = [], aside = '' }) {
+// rail 为假时不画轨道，由调用的页面自己画（时间轴的横轴要吸顶，不能跟页头一起滚走）。
+export function pageHead({ en = '', title, back = null, sub = '', tags = '', note = '', nums = [], aside = '', rail = true }) {
   const fmt = (v) => (typeof v === 'number' ? v.toLocaleString('en-US') : esc(v));
   const cols = nums.filter(Boolean).map(([label, v, unit, unitEn]) => `<div class="ph-num">
       <span class="ph-num-l">${esc(label)}</span>
@@ -95,7 +96,7 @@ export function pageHead({ en = '', title, back = null, sub = '', tags = '', not
       </div>
       ${aside || (cols ? `<div class="ph-nums">${cols}</div>` : '')}
     </div>
-    <div class="ph-track"></div>
+    ${rail ? '<div class="ph-track"></div>' : ''}
   </header>`;
 }
 
