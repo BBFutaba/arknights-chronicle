@@ -90,7 +90,12 @@ def main() -> int:
     # 单文件版不能再去取外部文件，字体写进 CSS
     css = re.sub(r"url\(fonts/([^)]+)\)", lambda m: "url(data:font/woff2;base64,"
                  + base64.b64encode((src / "fonts" / m.group(1)).read_bytes()).decode("ascii") + ")", css)
-    vendor =(src / "vendor" / "force-graph.min.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
+    # 字体是 OFL 授权，写进单文件时授权全文也要跟着走
+    licenses = "".join(p.read_text(encoding="utf-8") for p in sorted((src / "fonts").glob("*.LICENSE")))
+    if "*/" in licenses:
+        raise SystemExit("字体授权文本里有 */，不能直接放进 CSS 注释")
+    css = f"/*\n{licenses}*/\n{css}"
+    vendor = (src / "vendor" / "force-graph.min.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
     vendor = f"/*\n{(src / 'vendor' / 'force-graph.LICENSE').read_text(encoding='utf-8')}*/\n{vendor}"
     js = bundle_js(src).replace("</script", "<\\/script")
     blobs, raw = [], 0
