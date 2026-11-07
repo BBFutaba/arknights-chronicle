@@ -7,9 +7,10 @@
     python -m pipeline.deploy --no-release          # 不动 Release
     python -m pipeline.deploy --no-wait             # 不等 Pages 生效
     python -m pipeline.deploy --note "剧情写到……"   # 写进 Release 说明的一句话
+    python -m pipeline.deploy --version 1.0         # 指定版本号，默认是当天日期
 
-Release 的版本号是当天日期。同一天再发，原地更新：移动 tag，换文件，改说明。
-换了日期就新建一个，旧的不动，结束时打印删除旧版本的命令，由人决定要不要删。
+同一个版本号再发，原地更新：移动 tag，换文件，改说明。
+换了版本号就新建一个，旧的不动，结束时打印删除旧版本的命令，由人决定要不要删。
 
 gh-pages 每次都是强制覆盖，只有一个提交。
 """
@@ -123,8 +124,8 @@ def release_notes(version: str, note: str) -> str:
 """
 
 
-def update_release(note: str):
-    version = datetime.date.today().strftime("%Y.%m.%d")
+def update_release(note: str, version: str = ""):
+    version = version or datetime.date.today().strftime("%Y.%m.%d")
     head = out("git", "rev-parse", "HEAD")
     asset_name = f"kezhoulu-{version}.html"
     with tempfile.TemporaryDirectory() as tmp:
@@ -187,6 +188,7 @@ def main() -> int:
     ap.add_argument("--no-release", action="store_true", help="不更新 Release")
     ap.add_argument("--no-wait", action="store_true", help="不等 Pages 生效")
     ap.add_argument("--note", default="", help="写进 Release 说明的一句话")
+    ap.add_argument("--version", default="", help="Release 的版本号，默认是当天日期")
     a = ap.parse_args()
     require_clean("发布之前")
     branch = out("git", "branch", "--show-current")
@@ -200,7 +202,7 @@ def main() -> int:
     run("git", "push", "-q", "origin", "main")
     push_pages()
     if not a.no_release:
-        update_release(a.note)
+        update_release(a.note, a.version)
     if not a.no_wait:
         wait_for_pages()
     print(f"完成：{out('git', 'log', '--oneline', '-1')}")
