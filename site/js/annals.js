@@ -36,10 +36,15 @@ export function unmount() {
 // ---------------------------------------------------------------- 左栏
 
 function renderSide(vol) {
-  // 前纪、外纪在主线之前：分两段显示
-  const group = (v) => v.bian ?? '泰拉编';
+  // 泰拉编里前纪、外纪在主线之前，分段显示；有塔卫二编时，两编各加一个编名
+  const bian = (v) => v.bian ?? '泰拉编';
+  const multi = new Set(D.annals.volumes.map(bian)).size > 1;
+  const group = (v) => (bian(v) !== '泰拉编' ? ''
+    : v.year === '不系年' ? '不系年' : typeof v.year === 'number' && v.year >= 1096 ? '主线' : '前纪与外纪');
   const vols = D.annals.volumes.map((v, i, all) => {
-    const head = i === 0 || group(all[i - 1]) !== group(v) ? `<div class="an-vol-group muted">${group(v)}</div>` : '';
+    const newBian = i === 0 || bian(all[i - 1]) !== bian(v);
+    const head = (multi && newBian ? `<div class="an-vol-group">${esc(bian(v))}</div>` : '')
+      + ((newBian || group(all[i - 1]) !== group(v)) && group(v) ? `<div class="an-vol-group muted">${group(v)}</div>` : '');
     const active = vol && v.year === vol.year;
     const toc = active ? v.sections.map((s) => `
       <a class="list-item an-toc" href="#/annals/${v.year}?s=${encodeURIComponent(s.label)}">

@@ -149,8 +149,11 @@ export function makeShelf(cfg) {
   function update(r) {
     if (!content) return;
     const [key] = r.parts;
-    const requestedBian = r.params.get('bian') ?? (key?.startsWith('终末地·') ? BIANS[1] : BIANS[0]);
-    const item = key ? cfg.resolve(key, requestedBian) : null;
+    // 没写 bian= 的旧链接：先按名字猜编，找不到再到另一编找
+    const asked = r.params.get('bian');
+    const guess = key?.startsWith('终末地·') ? BIANS[1] : BIANS[0];
+    const item = !key ? null : asked ? cfg.resolve(key, asked)
+      : cfg.resolve(key, guess) ?? BIANS.map((b) => cfg.resolve(key, b)).find(Boolean);
     if (item) {
       // 看单篇时，左栏保留进来时的筛选
       if ([...r.params.keys()].some((k) => k !== 'e')) readState(r.params);
