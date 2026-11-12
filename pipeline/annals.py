@@ -22,7 +22,8 @@
 鸣谢与协议在 data/annals/鸣谢与协议.md。build 把原文从 site/data 里取出，导出 site/data/annals.json
 （网页「编年」页用）和 annals/<年份>.md（含原文，不提交）。
 
-博物志在 data/annals/博物志/*.md，每条以一行 @物 开头，格式见 data/annals/博物志须知.md。build 导出
+博物志在 data/annals/博物志/*.md，每条以一行 @物 开头，格式见 data/annals/博物志须知.md；文件名以「塔卫二」起头的属塔卫二编，
+人名和 @档 照塔卫二编的规则解析。build 导出
 site/data/bowu.json（网页「博物志」页用），只含编者文字和条目里写的短引。
 
 塔卫二编独立使用塔罗斯历，不与泰拉历换算：塔152/ 一年一卷，塔卫二前纪/ 收元年前及一五二年前的事。
@@ -1064,6 +1065,7 @@ class Wu:
 
     def __init__(self, name: str, where: str):
         self.name, self.where = name, where
+        self.bian = TERRA               # 文件名以「塔卫二」起头的属塔卫二编
         self.men: str | None = None
         self.aliases: list[str] = []
         self.powers: list[str] = []     # 关:
@@ -1139,15 +1141,29 @@ def ext_quote(kind: str, args: str, where: str, probs: Problems, notes: list[str
     return {"type": "comic", "title": title, "ep": ep.strip(), "page": loc, "who": who, "text": text}
 
 
-def wu_quote(kind: str, args: str, where: str, probs: Problems, notes: list[str]) -> dict | None:
+def wu_quote(kind: str, args: str, where: str, probs: Problems, notes: list[str],
+             bian: str = TERRA) -> dict | None:
     if kind == "@引":
         return story_quote(args, where, probs)
     if kind == "@档":
-        return wu_profile_quote(args, where, probs)
+        return profile_quote(args, where, probs, TALOS) if bian == TALOS else wu_profile_quote(args, where, probs)
     if kind in ("@书", "@影", "@漫", "@记"):
         return ext_quote(kind, args, where, probs, notes)
     probs.add(where, f"不认识的指令：{kind}")
     return None
+
+
+def wu_links(text: str, bian: str, probs: Problems, where: str) -> str:
+    """塔卫二编博物志里的 [[人名]] 照条目的规则连到终末地人物；不是终末地人物的（博物志条目等）原样留着。"""
+    if bian == TERRA:
+        return text
+
+    def link(m):
+        n = m[1].removeprefix("终末地·")
+        if m[1].startswith(("终末地·", "泰拉·")) or "终末地·" + ef_aliases().get(n, n) in characters():
+            return person_links(m[0], bian, probs, where)
+        return m[0]
+    return re.sub(r"\[\[([^\]|]+)(\|[^\]]*)?\]\]", link, text)
 
 
 def wu_line(w: Wu, field: str, s: str, where: str, probs: Problems, notes: list[str]):
@@ -1157,7 +1173,7 @@ def wu_line(w: Wu, field: str, s: str, where: str, probs: Problems, notes: list[
             probs.add(where, "【考异】里不放引文指令，引文写在【说】【沿革】【见】里")
             return
         kind, _, args = s.partition(" ")
-        q = wu_quote(kind, args.strip(), where, probs, notes)
+        q = wu_quote(kind, args.strip(), where, probs, notes, w.bian)
         if q:
             w.fields[WU_BLOCK[field]].append(q)
             if q["type"] in ("book", "video", "comic", "record"):
@@ -1172,25 +1188,27 @@ def wu_line(w: Wu, field: str, s: str, where: str, probs: Problems, notes: list[
             if m[1] == "条":
                 w.see["events"] += [v.replace("：", ":") for v in vals]  # 补条：补:名称
             elif m[1] == "传":
-                w.see["zhuan"] += [canon(v) for v in vals]
+                w.see["zhuan"] += [person_name(v, w.bian, probs, where) if w.bian == TALOS else canon(v) for v in vals]
             else:
                 w.see["shi" if m[1] == "事" else "wu"] += vals
     elif field == "考异":
         li = s.startswith("- ")
-        w.kaoyi.append({"li": li, "text": s[2:].strip() if li else s})
+        w.kaoyi.append({"li": li, "text": wu_links(s[2:].strip() if li else s, w.bian, probs, where)})
     else:
-        w.fields[WU_BLOCK[field]].append(s)
+        w.fields[WU_BLOCK[field]].append(wu_links(s, w.bian, probs, where))
 
 
 def parse_wu(path: Path, probs: Problems, notes: list[str]) -> list[Wu]:
     out: list[Wu] = []
     field = None
+    bian = TALOS if path.name.startswith("塔卫二") else TERRA
     for no, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         s, where = raw.strip(), f"{path.name}:{no}"
         if not s or s.startswith(("#", "<!--")):
             continue
         if s.startswith("@物"):
             out.append(parse_wu_head(s, where, probs))
+            out[-1].bian = bian
             field = None
             continue
         if not out:
@@ -1350,14 +1368,23 @@ def raw_files(q: dict) -> list[Path]:
     if q["type"] == "book":
         return [p for p in [RAW_DIR / q["title"] / "全文.txt"] if p.exists()]
     if q["type"] == "video":
-        return [p for p in (RAW_DIR / "视频" / "字幕").glob("*.txt") if title in squeeze(p.stem)]
+        return [p for p in video_subs() if title in squeeze(p.stem)]
     if q["type"] == "record":
         return [p for p in (RAW_DIR / "泰拉记事").glob("*/ocr.txt") if title in squeeze(p.parent.name)]
-    return [p for p in (RAW_DIR / "漫画").glob("*/ocr.txt") if title in squeeze(p.parent.name)]
+    return [p for p in comic_ocr() if title in squeeze(p.parent.name)]
+
+
+def video_subs() -> list[Path]:
+    """影片字幕。终末地的官方影片取自繁体频道，核对用转成简体的副本（字幕-简/）。"""
+    return [*(RAW_DIR / "视频" / "字幕").glob("*.txt"), *(RAW_DIR / "视频" / "终末地" / "字幕-简").glob("*.txt")]
+
+
+def comic_ocr() -> list[Path]:
+    return [*(RAW_DIR / "漫画").glob("*/ocr.txt"), *(RAW_DIR / "漫画" / "终末地").glob("*/ocr.txt")]
 
 
 def all_raw_files() -> list[Path]:
-    return [*RAW_DIR.glob("*/全文.txt"), *(RAW_DIR / "视频" / "字幕").glob("*.txt"), *(RAW_DIR / "漫画").glob("*/ocr.txt")]
+    return [*RAW_DIR.glob("*/全文.txt"), *video_subs(), *comic_ocr()]
 
 
 def verify_ext(q: dict, where: str, notes: list[str], tally: Counter) -> bool:
@@ -1430,7 +1457,7 @@ def export_wu(items: list[Wu], entries: list[Entry], liezhuan: list[dict]) -> di
     out = []
     for w in items:
         terms = [w.name, *w.aliases, *(t for pid in w.main for t in power_terms(pid))]
-        out.append({"name": w.name, "men": w.men, "aliases": w.aliases, "powers": w.powers, "main": w.main,
+        out.append({"name": w.name, "bian": w.bian, "men": w.men, "aliases": w.aliases, "powers": w.powers, "main": w.main,
                     "parent": w.parent, "blocks": w.fields, "see": w.see, "kaoyi": w.kaoyi,
                     "mentions": count_mentions(terms, docs)})
     owners = {pid: w.name for w in items for pid in w.main}
@@ -1865,15 +1892,18 @@ def verify_quotes(out_path: str | None = None):
     bad, total = [], 0
     raw_paths, tally = all_raw_files(), Counter()
     vols = [(y, load_volume(y, probs)) for y in volume_years()]
-    # 塔卫二编同季条目多，互相参见写「补条名」条；补条名不算短引
+    # 塔卫二编同季条目多，互相参见写「补条名」条；补条名、博物志条目名、本末名和单独一个 [[链接]] 都不算短引
+    wu_items = load_wu(Problems(), [])
     sup_names = {e.ids[0].removeprefix("补:") for _, es in vols for e in es if e.sup}
+    sup_names |= {n for w in wu_items for n in (w.name, *w.aliases)} | {b["title"] for b in load_benmo(Problems())}
+    is_ref = lambda q: q in sup_names or re.fullmatch(r"\[\[[^\]]+\]\]", q)
     for y, es in vols:
         for e in es:
             for g in e.groups:
                 fields = [("纲", g["gang"])] + [("目", t) for t in g["mu"]] + [("考异", k["text"]) for k in g["kaoyi"]]
                 for name, t in fields:
                     for q in re.findall(r"「([^「」]{4,})」", t):
-                        if q in sup_names:
+                        if is_ref(q):
                             continue
                         pieces = [norm(x) for x in re.split(r"……|…", q)]
                         pieces = [x for x in pieces if len(x) >= 3]
@@ -1883,9 +1913,11 @@ def verify_quotes(out_path: str | None = None):
                         # 游戏文本里找不到时，再到书外全文（OCR，有错字）里模糊比对
                         if not all(x in text for x in pieces) and not (raw_paths and raw_overlap(q, raw_paths) >= FUZZY_MIN):
                             bad.append((y, e.where, e.anchor, name, q))
-    for w in load_wu(Problems(), []):
+    for w in wu_items:
         for name, t in w.texts():
             for q in re.findall(r"「([^「」]{4,})」", t):
+                if is_ref(q):
+                    continue
                 pieces = [x for x in (norm(p) for p in re.split(r"……|…", q)) if len(x) >= 3]
                 if not pieces:
                     continue

@@ -109,6 +109,11 @@ export function pageHead({ en = '', title, back = null, sub = '', tags = '', not
   </header>`;
 }
 
+// 立绘和头像（characters.json 的 avatar、portrait，如 img/avatar/<id>.webp）。单文件版不内嵌图片，
+// 也没有旁边的 img/，改从公开网页取；取不到时由调用的页面在 error 事件里把图拿掉。
+const IMG_BASE = typeof document !== 'undefined' && document.getElementById('d:data/meta.json') ? 'https://bbfutaba.github.io/arknights-chronicle/' : '';
+export const imgSrc = (path) => (path ? IMG_BASE + path : '');
+
 export function h(html) {
   const t = document.createElement('template');
   t.innerHTML = html.trim();

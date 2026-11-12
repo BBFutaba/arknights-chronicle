@@ -235,6 +235,7 @@ class Element {
   querySelectorAll() { return []; }
   addEventListener() {}
   scrollIntoView() {}
+  insertAdjacentHTML(_, html) { this.innerHTML = html + this.innerHTML; }
 }
 const doc = new Element();
 globalThis.document = { activeElement: null, addEventListener() {}, removeEventListener() {},

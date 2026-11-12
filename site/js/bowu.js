@@ -9,7 +9,9 @@ import { inline, quoteHtml, kaoyiHtml } from './annals.js';
 import { powerSections } from './powers.js';
 
 let side, content, nodes = null, nodeByKey = {};
-let q = '', men = '', onlyWritten = false;
+let q = '', men = '', bian = '', onlyWritten = false;
+const BIAN = [['', '全部'], ['泰拉编', '泰拉'], ['塔卫二编', '塔卫二']];
+const bianOf = (n) => n.entry?.bian ?? '泰拉编';  // 只有地区势力、尚未成文的页都属泰拉编
 
 // ---------------------------------------------------------------- 目录数据
 
@@ -55,6 +57,7 @@ export function mount(el, r) {
   el.innerHTML = `
     <aside class="side panel bw-side">
       <input type="search" class="bw-q" placeholder="筛选条目（名字、别名）…">
+      ${D.bowu.entries.some((w) => w.bian === '塔卫二编') ? `<div class="seg-ctrl bw-bian">${BIAN.map(([b, t]) => `<button data-b="${b}">${t}</button>`).join('')}</div>` : ''}
       <div class="seg-ctrl bw-men">${['', ...D.bowu.men].map((m) => `<button data-m="${m}">${m || '全部'}</button>`).join('')}</div>
       <label class="toggle bw-written"><input type="checkbox"> 只看已成文</label>
       <div class="list"></div>
@@ -68,6 +71,10 @@ export function mount(el, r) {
   side.querySelector('.bw-men').addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (b) { men = b.dataset.m; renderList(); }
+  });
+  side.querySelector('.bw-bian')?.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b) { bian = b.dataset.b; renderList(); }
   });
   const wi = side.querySelector('.bw-written input');
   wi.checked = onlyWritten;
@@ -97,9 +104,10 @@ export function unmount() {
 function renderList(activeName) {
   activeName ??= side.querySelector('.list-item.active')?.dataset.name;
   side.querySelectorAll('.bw-men button').forEach((b) => b.classList.toggle('active', b.dataset.m === men));
+  side.querySelectorAll('.bw-bian button').forEach((b) => b.classList.toggle('active', b.dataset.b === bian));
   const ql = q.toLowerCase();
-  const filtering = q || onlyWritten;
-  const hit = (n) => (!onlyWritten || n.entry) && (!q || n.keys.some((k) => k.toLowerCase().includes(ql)));
+  const filtering = q || onlyWritten || bian;
+  const hit = (n) => (!onlyWritten || n.entry) && (!bian || bianOf(n) === bian) && (!q || n.keys.some((k) => k.toLowerCase().includes(ql)));
   const item = (n, depth) => {
     const color = n.pid ? `var(--c-${D.powers[n.pid].kind})` : 'var(--accent)';
     return `<a class="list-item${n.name === activeName ? ' active' : ''}" data-name="${esc(n.name)}" href="${href.wu(n.name)}"
@@ -109,7 +117,7 @@ function renderList(activeName) {
   };
   const tree = (n, depth) => item(n, depth) + n.kids.map((k) => tree(k, depth + 1)).join('');
   const sections = D.bowu.men.filter((m) => !men || m === men).map((m) => {
-    const own = nodes.filter((n) => n.men === m);
+    const own = nodes.filter((n) => n.men === m && (!bian || bianOf(n) === bian));
     const body = filtering ? own.filter(hit).map((n) => item(n, 0)).join('')
       : own.filter((n) => !n.parentNode).map((n) => tree(n, 0)).join('');
     if (filtering && !body) return '';

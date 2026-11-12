@@ -68,6 +68,12 @@ export function mount(el, r) {
     const a = e.target.closest('[data-row]');
     if (a) scroller.scrollTo({ top: headHeight() + Number(a.dataset.row) * ROW, behavior: 'smooth' });  // 这一行正好贴在吸顶的横轴下面
   });
+  // 换到立体视图时带上选中的事件（存目没有编年史条目，就用眼前第一条）
+  el.querySelector('.tl-head').addEventListener('click', (e) => {
+    const a = e.target.closest('.tl-to3d');
+    const id = a && [selected, visible[0]?.id].map((x) => (D.annalsEntry[x] ? x : D.annalsByEvent[x])).find(Boolean);
+    if (id) a.href = `#/timeline3d?${new URLSearchParams({ e: id })}`;
+  });
   document.addEventListener('keydown', onKey);
   lastFilterKey = null;
   update(r);
@@ -256,7 +262,7 @@ function renderSide(lanes) {
   root.querySelector('.tl-head').innerHTML = pageHead({
     en: state.char || state.power || state.thread ? 'FILTERED' : 'ALL EVENTS',
     title,
-    sub: esc(state.bian),
+    sub: `${esc(state.bian)} · <a class="tl-to3d" href="#/timeline3d">立体视图</a>`,
     rail: false,
     nums: [
       ['显示', visible.length, '条', 'SHOWN'], ['全部', total, '条', 'TOTAL'],

@@ -117,6 +117,8 @@ class SiteExporter:
                     co[b][a] += 1
         names = set(appear) | set(self.char_events)
         names |= {c.name for c in self.reg.chars.values() if c.kind == "operator"}
+        # 立绘和头像由 python -m pipeline.images 下载缩好放在 site/img/；这里只看有哪些，有才写字段
+        img = {k: {p.stem for p in (config.SITE / "img" / k).glob("*.webp")} for k in ("avatar", "portrait")}
         out = {}
         for n in sorted(names):
             c = self.reg.chars[n]
@@ -129,6 +131,11 @@ class SiteExporter:
                 "events": self.char_events.get(n, []),
                 "co": co[n].most_common(CO_TOP),
             }
+            if c.kind == "operator":  # 取第一个有图的 id，头像和立绘尽量同一个
+                ids = sorted(c.char_ids, key=lambda i: not (i in img["avatar"] and i in img["portrait"]))
+                for k in ("avatar", "portrait"):
+                    if cid := next((i for i in ids if i in img[k]), None):
+                        entry[k] = f"img/{k}/{cid}.webp"
             if getattr(c, "game", "") == "endfield":
                 entry["game"] = "endfield"
                 if getattr(c, "profile", None):

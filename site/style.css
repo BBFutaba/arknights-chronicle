@@ -383,7 +383,6 @@ main.view-graph { background: var(--bg); color: var(--text); }
 .g-f-label { width: 4.5em; flex: none; color: var(--muted); }
 .g-f-v { width: 2.8em; text-align: right; font-weight: 500; font-size: 12px; }
 .graph-info { position: absolute; right: 12px; top: 12px; width: 280px; max-height: calc(100% - 24px); overflow: auto; padding: 14px; background: var(--panel-2); border: 1px solid var(--line); }
-.legend { display: flex; flex-wrap: wrap; gap: 5px; }
 .range-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .range-row input { flex: 1; min-width: 0; }
 input[type=range] { -webkit-appearance: none; appearance: none; height: 16px; margin: 0; background: none; cursor: pointer; }
@@ -546,7 +545,12 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 .event-item { position: relative; display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: baseline; padding: 7px 8px; border-bottom: 1px solid var(--line); }
 /* 整行点进事件：链接的伪元素铺满整行，故事线标签浮在上面，点它去故事线 */
 .event-item > a.text::after { content: ""; position: absolute; inset: 0; }
-.event-item > .thread-chip { position: relative; z-index: 1; }
+.event-item > .thread-chip { position: relative; z-index: 1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* 终末地的故事线名字很长：窄屏上日期和故事线占一行，正文另起一行，不把正文挤成零宽 */
+@media (max-width: 640px) {
+  .event-item:has(> .thread-chip) { grid-template-columns: auto minmax(0, 1fr); }
+  .event-item:has(> .thread-chip) > .text { grid-column: 1 / -1; }
+}
 .event-item:hover { background: var(--hover); color: var(--text); box-shadow: inset 3px 0 var(--lime); }
 .event-item .when { color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .bw-hit { background: var(--lime); color: var(--ink); padding: 0 2px; }
@@ -735,22 +739,11 @@ details[open] > summary::before { content: "\2212"; background: var(--lime); bor
 
 /* ── 关系图：没有页头，轨道停在左栏边上 ─────────────────────────────────── */
 .graph-main { --panel: var(--g-bg); }
-#fg { background: var(--reg-plane); }
 main.view-graph .station { height: 109px; }
 main.view-graph .st-track { margin-top: auto; }
 .g-min-row { white-space: nowrap; }
 .graph-info h3 { font-size: 20px; font-weight: 900; margin-bottom: 2px; }
-/* 图例就是节点本身：半身像加名字的框，和地区势力的标签放在一起 */
-.lg { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid var(--ink); font-size: 12px; font-weight: 700; line-height: 1; white-space: nowrap; }
-.lg i { position: relative; flex: none; width: 20px; height: 20px; margin: 0 6px 0 -8px; background: var(--lg-face-bg); }
-.lg i::after { content: ""; position: absolute; inset: 0; background: var(--lg-face); -webkit-mask: var(--bust) center / 100% no-repeat; mask: var(--bust) center / 100% no-repeat; }
-.lg-operator { background: var(--paper); color: var(--paper-fg); --lg-face-bg: var(--ink); --lg-face: var(--tag-fg); }
-.lg-npc { background: var(--panel); border-color: var(--g-edge); color: var(--text); --lg-face-bg: transparent; --lg-face: var(--g-edge); }
-.lg-doctor { background: var(--ink); color: #fff; --lg-face-bg: var(--lime); --lg-face: var(--ink); }
-.lg-region { background: var(--ink); border-color: var(--g-edge); color: var(--tag-fg); }
-.lg-faction { background: var(--ink); color: var(--lime); border-color: var(--lime); }
-.lg-event { padding: 0; border: 0; gap: 7px; color: var(--text); }
-.lg-event b { width: 10px; height: 10px; margin: 0 3px; background: var(--panel); border: 1px solid var(--g-edge); transform: rotate(45deg); }
+/* 板面、卡片、图例的样子在文件末尾「关系图：线索板」 */
 
 @media (max-width: 1240px) {
   .ph-num-v b { font-size: 34px; }
@@ -781,3 +774,259 @@ main.view-graph .st-track { margin-top: auto; }
 .tl-bian, .shelf-bian { margin: 8px 0 12px; max-width: 100%; }
 .tl-categories { display: contents; }
 .bian-talos .game-mark { display: none; }
+
+/* ── 人物页的立绘和头像（chars.js；图由 pipeline.images 生成，取不到时整块拿掉） ── */
+/* 立绘印在灰纸上，四角裁切标，底下一条黑底注；宽屏时在右栏，跟着滚动 */
+.ch-lead.has-portrait { display: grid; grid-template-columns: minmax(0, 1fr) clamp(230px, 24vw, 320px); grid-template-areas: "main fig"; gap: 0 32px; align-items: start; }
+.ch-lead-main { grid-area: main; min-width: 0; }
+.ch-portrait { grid-area: fig; position: sticky; top: 16px; margin: 12px 0 8px; padding: 16px 16px 0; background: var(--paper) var(--reg-paper); color: var(--paper-fg); }
+.ch-portrait::before, .ch-portrait::after { content: ""; position: absolute; width: 8px; height: 8px; border: 0 solid var(--paper-fg); }
+.ch-portrait::before { left: 5px; top: 5px; border-width: 1px 0 0 1px; }
+.ch-portrait::after { right: 5px; bottom: 33px; border-width: 0 1px 1px 0; }
+.ch-portrait img { display: block; width: 100%; height: auto; max-height: min(560px, 62vh); object-fit: contain; object-position: 50% 100%; }
+.ch-portrait figcaption { display: flex; justify-content: space-between; align-items: center; gap: 10px; height: 26px; margin: 10px -16px 0; padding: 0 10px; background: var(--ink); color: #fff; font: 800 11px/1 var(--f-num); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.ch-portrait figcaption b { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--lime); font-weight: 800; }
+.ch-portrait figcaption span { flex: none; font-size: 9.5px; opacity: .7; }
+/* 头像：页头名字前一个方块，角上一粒荧光绿 */
+.ph h1.ch-h1 { display: flex; align-items: center; gap: 14px; }
+.ch-avatar { position: relative; flex: none; width: 56px; height: 56px; background: var(--ink); border: 1px solid var(--text); }
+.ch-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ch-avatar::after { content: ""; position: absolute; right: -5px; bottom: -5px; width: 9px; height: 9px; background: var(--lime); border: 1px solid var(--text); }
+/* 人物列表：有头像的干员用小头像代替圆点 */
+.list-item .ch-li-mark { flex: none; align-self: center; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; }
+.ch-li-mark img { width: 22px; height: 22px; object-fit: cover; background: var(--ink); }
+@media (max-width: 1100px) {
+  .ch-lead.has-portrait { grid-template-columns: minmax(0, 1fr); grid-template-areas: "fig" "main"; }
+  .ch-portrait { position: relative; top: 0; max-width: 420px; }
+  .ch-portrait img { max-height: 380px; }
+}
+@media (max-width: 760px) {
+  .ch-portrait { max-width: none; }
+  .ch-portrait img { max-height: 340px; }
+  .ph h1.ch-h1 { gap: 10px; }
+  .ch-avatar { width: 42px; height: 42px; }
+}
+
+/* ── 关系图：线索板 ───────────────────────────────────────────────────────
+   侦探办案用的那种板：软木（深色主题是绒布）、图钉、红毛线、剪报、海报、便签。
+   画布在 graph.js 的 readPalette 里读这些 --g-*，只能写十六进制；--g-felt 是 1 时板面画成绒布。
+   左栏的图例也用它们，所以挂在 main.view-graph 上。 */
+main.view-graph {
+  --g-board: #b08657;
+  --g-board-dk: #6b4526;
+  --g-board-lt: #dcbb8a;
+  --g-felt: 0;
+  --g-frame: #4a321d;
+  --g-vignette: rgb(46 24 6 / 45%);
+  --g-yarn: #b3101b;
+  --g-yarn-hot: #e8121f;
+  --g-thread: #262a33;
+  --g-note-thread: #f6f0de;
+  --g-card: #f6f3ec;
+  --g-card-line: #a7bcd2;
+  --g-card-red: #d4524c;
+  --g-pencil: #57524a;
+  --g-manila: #d8c08f;
+  --g-manila-line: #b39a69;
+  --g-news: #ece7d9;
+  --g-news-fg: #151411;
+  --g-news-line: #aaa596;
+  --g-poster: #141416;
+  --g-tape: #f2e8c4;
+  --g-sticky: #f4d85e;
+  --g-ink: #1a1915;
+  --g-pin: #d1301f;
+  --g-pin-power: #c9a54e;
+  --g-pin-event: #f3f1ea;
+}
+/* 深色主题：板子换成深色绒布，纸都压暗一档，免得一块块白得刺眼 */
+[data-theme="deep"] main.view-graph {
+  --g-board: #2a3832;
+  --g-board-dk: #141c18;
+  --g-board-lt: #4d6357;
+  --g-felt: 1;
+  --g-frame: #0f1512;
+  --g-vignette: rgb(0 0 0 / 50%);
+  --g-yarn: #d2303a;
+  --g-yarn-hot: #ff434b;
+  --g-thread: #c9d2cc;
+  --g-note-thread: #e7e0c9;
+  --g-card: #dbd7cb;
+  --g-card-line: #93a7b9;
+  --g-card-red: #b8524c;
+  --g-pencil: #4f4b44;
+  --g-manila: #bba67c;
+  --g-manila-line: #927d55;
+  --g-news: #d2ccbb;
+  --g-news-line: #8c8778;
+  --g-poster: #0d110f;
+  --g-tape: #d6cca7;
+  --g-sticky: #cfb84f;
+  --g-pin-power: #b39349;
+  --g-pin-event: #dedbd2;
+}
+[data-theme="night"] main.view-graph {
+  --g-board: #262d37;
+  --g-board-dk: #13161c;
+  --g-board-lt: #4a5462;
+  --g-felt: 1;
+  --g-frame: #0d1015;
+  --g-vignette: rgb(0 0 0 / 52%);
+  --g-yarn: #d6343c;
+  --g-yarn-hot: #ff4b53;
+  --g-thread: #c3c9d2;
+  --g-note-thread: #e4dfcf;
+  --g-card: #d6d3ca;
+  --g-card-line: #8d9fb3;
+  --g-card-red: #b4514c;
+  --g-pencil: #4d4a45;
+  --g-manila: #b3a17c;
+  --g-manila-line: #8b7a58;
+  --g-news: #cdc8b9;
+  --g-news-line: #898476;
+  --g-poster: #0e1116;
+  --g-tape: #d2c9a8;
+  --g-sticky: #c9b354;
+  --g-pin-power: #b39349;
+  --g-pin-event: #dcd9d1;
+}
+#fg { background: var(--g-board); }
+/* 板子边上一圈暗角，像挂在墙上的一块板 */
+#fg::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--g-frame), inset 0 0 0 4px rgb(0 0 0 / 10%), inset 0 0 110px 12px var(--g-vignette); }
+/* 左上角的标题是一张撕下来贴上去的海报，顶上压一截胶带 */
+.g-board-title { position: absolute; left: 22px; top: 20px; z-index: 2; pointer-events: none; max-width: calc(100% - 44px);
+  transform: rotate(-1.6deg); filter: drop-shadow(2px 4px 0 rgb(0 0 0 / 30%)); }
+.g-board-title::before { content: ""; position: absolute; left: 50%; top: -9px; z-index: 1; width: 66px; height: 19px; margin-left: -33px;
+  background: var(--g-tape); opacity: .86; transform: rotate(4deg); }
+.g-bt-paper { padding: 10px 20px 14px 15px; background: var(--g-poster); color: #f4f1e8;
+  clip-path: polygon(0 4%, 14% 0, 41% 3%, 70% 0, 100% 3%, 99% 90%, 88% 100%, 66% 94%, 43% 100%, 19% 95%, 1% 100%); }
+.g-bt-paper b { display: block; font: 900 30px/1.05 var(--f-body); letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-bt-paper small { display: block; margin-top: 6px; font: 700 10.5px/1.2 var(--f-num); letter-spacing: .14em; color: var(--lime); white-space: nowrap; }
+/* 选中后的档案卡：一张钉在板上的卡片，深色主题下也是浅纸深字 */
+.graph-info { top: 20px; right: 20px; z-index: 3; width: 292px; max-height: calc(100% - 40px); padding: 24px 16px 14px; border: 0;
+  background: var(--g-card); color: var(--g-ink); transform: rotate(.7deg); box-shadow: 3px 6px 0 rgb(0 0 0 / 26%);
+  --text: var(--g-ink); --muted: #5f5a50; --line: #c9c2b0; --accent: var(--g-ink); --on-accent: #fff; --panel-2: #ebe6d9; --hover: #e2dbca;
+  color-scheme: light; scrollbar-color: #b3ab97 transparent; }
+.graph-info::before { content: ""; position: absolute; left: 50%; top: 3px; width: 88px; height: 17px; margin-left: -44px;
+  background: var(--g-tape); opacity: .92; transform: rotate(-2deg); box-shadow: 0 1px 0 rgb(0 0 0 / 8%); }
+.g-info-photo { float: right; width: 66px; height: 66px; margin: -4px 0 8px 12px; object-fit: cover; background: linear-gradient(#a9b4bb, #6f7c86);
+  border: 4px solid #fbf9f4; border-bottom-width: 10px; box-shadow: 1px 2px 0 rgb(0 0 0 / 22%); transform: rotate(2.5deg); }
+/* 在板上找人 */
+.g-find { display: flex; flex-direction: column; gap: 6px; }
+.g-q { width: 100%; }
+.g-hits { display: flex; flex-wrap: wrap; gap: 4px; }
+.g-hits:empty { display: none; }
+.g-hit { display: inline-flex; align-items: baseline; gap: 5px; padding: 2px 9px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+  font: 600 12.5px/1.5 var(--f-body); cursor: pointer; }
+.g-hit:hover { background: var(--lime); border-color: var(--ink); color: var(--ink); }
+.g-hit small { font-size: 10.5px; font-weight: 500; color: var(--muted); }
+.g-hit:hover small { color: var(--ink); }
+/* 图例：每样东西画一个小样 */
+.g-legend { display: flex; flex-wrap: wrap; gap: 7px 12px; font-size: 12px; font-weight: 600; }
+.gl { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.gl i { position: relative; flex: none; display: block; }
+.gl-operator i, .gl-npc i, .gl-doctor i { width: 13px; height: 15px; box-shadow: 1px 1.5px 0 rgb(0 0 0 / 30%); }
+.gl-operator i { background: linear-gradient(#77858f, #77858f) 2px 2px / 9px 9px no-repeat, var(--g-card); transform: rotate(-4deg); }
+.gl-npc i { background: var(--g-manila); transform: rotate(3deg); }
+.gl-doctor i { background: var(--g-ink); transform: rotate(-2deg); }
+.gl-operator i::after, .gl-npc i::after, .gl-doctor i::after { content: ""; position: absolute; left: 50%; top: -2px; width: 5px; height: 5px; margin-left: -2.5px;
+  border-radius: 50%; background: var(--g-pin); }
+.gl-doctor i::after { background: var(--lime); }
+.gl-region, .gl-faction { padding: 1px 7px; line-height: 1.5; box-shadow: 1px 1.5px 0 rgb(0 0 0 / 25%);
+  clip-path: polygon(0 6%, 30% 0, 62% 8%, 100% 0, 100% 94%, 70% 100%, 35% 92%, 0 100%); }
+.gl-region { background: var(--g-news); color: var(--g-news-fg); font-family: "Songti SC", STSong, "Noto Serif CJK SC", SimSun, serif; font-weight: 700; }
+.gl-faction { background: var(--g-poster); color: var(--lime); font-weight: 900; }
+.gl-event i { width: 12px; height: 12px; background: var(--g-sticky); box-shadow: 1px 1.5px 0 rgb(0 0 0 / 25%); transform: rotate(4deg); }
+.gl-yarn i, .gl-thread i { width: 24px; height: 12px; background: linear-gradient(var(--g-yarn), var(--g-yarn)) center / 100% 2px no-repeat, var(--g-board); }
+.gl-thread i { background: linear-gradient(var(--g-thread), var(--g-thread)) center / 100% 1px no-repeat, var(--g-board); }
+@media (max-width: 760px) {
+  .g-board-title { left: 10px; top: 12px; }
+  .g-bt-paper { padding: 6px 13px 10px 10px; }
+  .g-bt-paper b { font-size: 20px; }
+  .g-bt-paper small { margin-top: 4px; font-size: 9px; letter-spacing: .08em; }
+  .graph-info { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 52%; transform: none; }
+}
+
+
+/* ── 立体时间轴（timeline3d.js）：左栏是纸，右边内容平面上一块画布 ───────────────────
+   画布里的颜色由 timeline3d.js 从这些变量读出来；这里只管左栏、悬停框、时间轨道和角上的字 */
+.t3-side { width: 262px; flex: none; padding: 18px 16px 10px 24px; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.t3-switch { flex-wrap: nowrap; }
+.t3-switch a, .t3-switch button { padding: 3px 14px; border: 1px solid var(--line); background: none; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.t3-switch a:hover { background: var(--hover); color: var(--text); }
+.t3-switch .active, .t3-switch .active:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); cursor: default; }
+.t3-filters { display: flex; flex-direction: column; gap: 8px; }
+.t3-filters label { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.t3-filters select, .t3-filters input { min-width: 0; color: var(--text); font-size: 13px; font-weight: 400; }
+.t3-count .t3-clear { margin-left: 4px; padding: 0 7px; border: 1px solid var(--line); background: none; font-size: 12px; cursor: pointer; }
+.t3-count .t3-clear:hover { background: var(--hover); }
+.t3-eras { display: flex; flex-direction: column; gap: 1px; margin: 0 -4px; }
+.t3-eras button { display: flex; justify-content: space-between; gap: 8px; padding: 3px 8px; border: none; background: none; font-size: 13px; text-align: left; cursor: pointer; }
+.t3-eras button:hover { background: var(--hover); }
+.t3-eras button.talos { box-shadow: inset 3px 0 var(--lime); }
+.t3-read summary { font-size: 13px; font-weight: 700; cursor: pointer; }
+.t3-read-body p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--muted); }
+.t3-read-body b { color: var(--text); }
+
+.t3-main.content { position: relative; flex: 1; min-width: 0; padding: 0; overflow: hidden; background: var(--panel) var(--reg-plane); touch-action: none; }
+.t3-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; outline: none; }
+.t3-canvas.dragging { cursor: grabbing; }
+.t3-canvas.on-point { cursor: pointer; }
+.t3-loading { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; }
+/* 左上角：当前时刻，大数字 + 两行小注 */
+.t3-hud { position: absolute; left: 22px; top: 16px; display: flex; flex-direction: column; gap: 3px; max-width: calc(100% - 140px); pointer-events: none; }
+.t3-hud b { font: 800 48px/.92 var(--f-num); letter-spacing: -.045em; font-feature-settings: "tnum" 1; white-space: nowrap; }
+.t3-hud span { font-size: 12.5px; font-weight: 700; line-height: 1.45; color: var(--muted); }
+.t3-hud span:first-of-type { margin-top: 4px; color: var(--text); }
+.t3-hud.talos b { box-shadow: inset 0 -6px var(--lime); align-self: flex-start; }
+/* 悬停框：灰纸 + 荧光绿竖条 */
+.t3-tip { position: absolute; z-index: 2; width: max-content; max-width: min(320px, calc(100% - 24px)); padding: 9px 12px 10px;
+  background: var(--paper); color: var(--paper-fg); border: 1px solid var(--ink); border-left: 4px solid var(--lime);
+  font-size: 13px; line-height: 1.6; pointer-events: none; }
+.t3-tip.pinned { pointer-events: auto; }
+.t3-tip .muted, .t3-tip-meta, .t3-tip-when span { color: var(--paper-muted); }
+.t3-tip-when { display: flex; justify-content: space-between; gap: 14px; font-size: 12.5px; font-weight: 800; }
+.t3-tip-when span { font-weight: 600; }
+.t3-tip-gang { margin-top: 3px; font-weight: 700; }
+.t3-tip-meta { margin-top: 4px; font-size: 12px; }
+.t3-tip-open { display: inline-block; margin-top: 7px; padding: 1px 8px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; }
+.t3-tip-open:hover { background: var(--lime); color: var(--ink); }
+.t3-btns { position: absolute; right: 104px; bottom: 12px; display: flex; gap: 6px; }
+.t3-btns .btn { padding: 3px 11px; background: var(--panel); font-size: 12px; }
+.t3-help { position: absolute; left: 22px; bottom: 15px; max-width: calc(100% - 290px); color: var(--muted); pointer-events: none; }
+.t3-help-touch { display: none; }
+@media (hover: none) { .t3-help-mouse { display: none; } .t3-help-touch { display: inline; } }
+/* 右边的时间轨道：全书从上到下，绿条走到当前时刻；斜纹是断开处，虚框是没有年份的区段 */
+.t3-rail { position: absolute; right: 14px; top: 16px; bottom: 50px; width: 78px; cursor: ns-resize; touch-action: none; user-select: none; }
+.t3-rail-track { position: absolute; right: 0; top: 0; bottom: 0; width: 15px; background: var(--rail-band-v) 4px 0 / 7px 100% no-repeat; }
+.t3-rail-fill { position: absolute; left: 5px; top: 0; width: 5px; height: var(--at, 0); background: var(--lime); }
+.t3-rail-t { position: absolute; left: -5px; width: 7px; height: 1px; background: var(--text); }
+.t3-rail-gap { position: absolute; left: 0; width: 15px; background: repeating-linear-gradient(135deg, var(--panel) 0 3px, var(--text) 3px 4px); }
+.t3-rail-band { position: absolute; left: 2px; width: 11px; border: 1px dashed var(--text); }
+.t3-rail-cal { position: absolute; left: -4px; width: 23px; height: 4px; margin-top: -2px; background: var(--lime); box-shadow: 0 0 0 1px var(--ink); }
+.t3-rail-mark { left: 0; top: var(--at, 0); margin-top: -7.5px; pointer-events: none; }
+.t3-rail-labels { position: absolute; right: 23px; top: 0; bottom: 0; width: 56px; pointer-events: none; }
+.t3-rail-labels span { position: absolute; right: 0; transform: translateY(-50%); font: 700 10.5px/1 var(--f-num); color: var(--muted); white-space: nowrap; }
+.t3-rail-labels span.talos { color: var(--text); }
+.t3-rail-labels span.cal { padding: 1px 3px; background: var(--lime); color: var(--ink); }
+@media (max-width: 1100px) {
+  .t3-side { width: 224px; padding-left: 16px; }
+}
+@media (max-width: 760px) {
+  main.view-timeline3d { overflow: hidden; }
+  .t3-side { width: auto; flex: none; padding: 8px 12px; gap: 6px; overflow: visible; }
+  .t3-side .t3-eras, .t3-side .station { display: none; }  /* 手机上画布要高，标题块不要了 */
+  .t3-filters { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr) minmax(0, 1fr); gap: 6px; }
+  .t3-filters label { font-size: 11px; }
+  .t3-filters select, .t3-filters input { padding: 4px 6px; font-size: 12.5px; }
+  .t3-read-body { max-height: 30vh; overflow: auto; }
+  .t3-hud { left: 12px; top: 10px; max-width: calc(100% - 80px); }
+  .t3-hud b { font-size: 30px; }
+  .t3-hud span { font-size: 11.5px; }
+  .t3-rail { right: 6px; top: 10px; bottom: 50px; width: 52px; }
+  .t3-rail-labels { right: 19px; width: 34px; }
+  .t3-rail-labels span { font-size: 9.5px; }
+  .t3-btns { right: 8px; bottom: 10px; }
+  .t3-help { display: none; }
+}

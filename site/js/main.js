@@ -6,6 +6,7 @@ import { initSearch } from './search.js';
 import { initStage, setStation } from './station.js';
 import { initTheme } from './theme.js';
 import * as timeline from './timeline.js';
+import * as timeline3d from './timeline3d.js';
 import * as story from './story.js';
 import * as chars from './chars.js';
 import * as bowu from './bowu.js';
@@ -15,7 +16,8 @@ import * as benmo from './benmo.js';
 import * as zhuan from './zhuan.js';
 import * as xieyi from './xieyi.js';
 
-const VIEWS = { timeline, annals, benmo, zhuan, story, chars, bowu, graph, xieyi };
+const VIEWS = { timeline, timeline3d, annals, benmo, zhuan, story, chars, bowu, graph, xieyi };
+const TAB_OF = { timeline3d: 'timeline' };  // 立体时间轴是时间轴的另一种看法，不另占标签
 const view = document.getElementById('view');
 let current = null;
 
@@ -51,7 +53,8 @@ function route() {
     location.replace(`${moved(r.parts[1])}${qs ? `?${qs}` : ''}`);
     return;
   }
-  document.querySelectorAll('#tabs a').forEach((a) => a.classList.toggle('active', a.dataset.view === r.name));
+  const tab = TAB_OF[r.name] ?? r.name;
+  document.querySelectorAll('#tabs a').forEach((a) => a.classList.toggle('active', a.dataset.view === tab));
   const mod = VIEWS[r.name];
   const fresh = !(current === r.name && mod.update);
   if (fresh) {
@@ -63,7 +66,7 @@ function route() {
   } else {
     mod.update(r);
   }
-  setStation(r.name, view, fresh);
+  setStation(tab, view, fresh);
 }
 
 function initAbout() {

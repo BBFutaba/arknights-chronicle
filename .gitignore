@@ -17,3 +17,5 @@ StoryText/
 /刻舟录-*.html
 # 用户放进来的素材（设定集等，版权属于原作者），只留本地，不要上传
 Raw Data/
+# 干员立绘和头像（游戏美术，版权属于鹰角网络），由 python -m pipeline.images 下载缩图，不进仓库
+site/img/

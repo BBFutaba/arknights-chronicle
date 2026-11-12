@@ -1,6 +1,6 @@
 // 人物：左侧可筛选的人物列表，右侧人物卡片（档案、出场、相关事件、常同场人物）。
 import { D, BIANS } from './data.js';
-import { esc, href, KIND_LABEL, charName, charLabel, charMark, charChip, powerChip, eventItem, groupLabel, pageHead } from './util.js';
+import { esc, href, KIND_LABEL, charName, charLabel, charMark, charChip, powerChip, eventItem, groupLabel, pageHead, imgSrc } from './util.js';
 
 const KIND_EN = { operator: 'OPERATOR', npc: 'NPC', doctor: 'DOCTOR' };
 
@@ -28,6 +28,8 @@ export function mount(el, r) {
     <section class="content panel"></section>`;
   side = el.querySelector('.side');
   content = el.querySelector('.content');
+  // 图取不到（缺图、单文件版离线）：立绘整块拿掉，头像拿掉，列表里换回圆点。error 不冒泡，在捕获阶段接
+  for (const box of [side, content]) box.addEventListener('error', dropImage, true);
   side.querySelector('.ch-bian').addEventListener('change', (e) => {
     q = power = '';
     side.querySelector('.ch-q').value = '';
@@ -86,7 +88,8 @@ function renderList(activeName) {
   const metric = (c) => sort === 'lines' ? `${c.lines} 句` : sort === 'events' ? `${c.events.length} 事件` : `${epCount(c)} 集`;
   side.querySelector('.list').innerHTML = shown.map(([n, c]) => `
     <a class="list-item${n === activeName ? ' active' : ''}" data-name="${esc(n)}" href="${href.char(n)}?${new URLSearchParams({ bian })}">
-      <span class="n" style="color:var(--c-${c.kind})">●</span><span class="grow">${charLabel(n)}</span>
+      <span class="n ch-li-mark" style="color:var(--c-${c.kind})">${c.avatar
+        ? `<img src="${esc(imgSrc(c.avatar))}" alt="" loading="lazy" decoding="async">` : '●'}</span><span class="grow">${charLabel(n)}</span>
       <span class="n">${metric(c)}</span></a>`).join('')
     + (arr.length > LIST_LIMIT ? `<div class="muted small pad">共 ${arr.length} 人，只显示前 ${LIST_LIMIT} 个，请用搜索缩小范围。</div>` : '');
 }
@@ -111,6 +114,11 @@ function renderProfile(name) {
       written ? ['书中记述', written, '条', 'ANNALS'] : null,
     ],
   })}
+    <div class="ch-lead${c.portrait ? ' has-portrait' : ''}">
+    ${c.portrait ? `<figure class="ch-portrait">
+      <img src="${esc(imgSrc(c.portrait))}" alt="${esc(charName(name))}立绘" loading="lazy" decoding="async">
+      <figcaption><b>${esc(c.appellation || '')}</b><span>© HYPERGRYPH</span></figcaption></figure>` : ''}
+    <div class="ch-lead-main">
     <div class="actions">
       ${evs.length ? `<a class="btn" href="${href.timeline({ char: name })}">在时间轴中查看（${evs.length} 条事件）</a>` : ''}
       <a class="btn" href="${href.graph('char', name)}">在关系图中查看</a>
@@ -121,6 +129,7 @@ function renderProfile(name) {
     ${basic.length ? `<h4>基础档案</h4><dl class="kv">${basic.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
     ${prof?.sections?.length ? `<h4>干员档案</h4>${prof.sections.map((s) => `
       <details ${s.title === '客观履历' ? 'open' : ''}><summary>${esc(s.title)}</summary><div class="prose">${esc(s.text)}</div></details>`).join('')}` : ''}
+    </div></div>
     <div class="cols">
       <div>
         <h4>出场剧情（${epCount(c)} 集，台词 ${c.lines} 句）</h4>
@@ -137,6 +146,21 @@ function renderProfile(name) {
         ${evs.length ? `<h4>相关事件（${evs.length}）</h4>${evs.map(eventItem).join('')}` : ''}
       </div>
     </div>`;
+  // 头像放在页头的名字前面；页头的标题是转义过的纯文字，所以渲染完再插进去
+  if (c.avatar) {
+    const h1 = content.querySelector('.ph h1');
+    h1.classList.add('ch-h1');
+    h1.insertAdjacentHTML('afterbegin',
+      `<span class="ch-avatar"><img src="${esc(imgSrc(c.avatar))}" alt="" loading="lazy" decoding="async"></span>`);
+  }
+}
+
+function dropImage(e) {
+  const img = e.target;
+  if (img.tagName !== 'IMG') return;
+  if (img.parentElement.classList.contains('ch-li-mark')) return img.replaceWith('●');
+  img.closest('.has-portrait')?.classList.remove('has-portrait');
+  (img.closest('.ch-portrait, .ch-avatar') ?? img).remove();
 }
 
 // 编年史中写到此人的条目（【人物】里有他的）；立了传的另有按钮

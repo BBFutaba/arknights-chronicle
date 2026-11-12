@@ -74,6 +74,9 @@ SPEAKER_FIX = {
     "模糊的男声{c33m1-杰弗里": ("杰弗里", "", "编者定：内部名同作 c33m1-杰弗里，并入杰弗里"),
     "史尔特尔的声音{c16-史尔特尔": ("史尔特尔", "", "编者定：内部名同作 c16-史尔特尔，并入史尔特尔"),
     "神色悲戚的天师{e10m3-神色悲戚的天师": ("赵叔", "", "编者定：庄方宜当面称他赵叔，以赵叔为正名"),
+    "严肃的天师{sm2l8m1-韩天师": ("韩天师", "", "编者定：内部名作韩天师，只此一任务；主线 e11 的严肃的天师不并"),
+    "年长的天师{sm2l8m1-陈天师": ("陈天师", "", "编者定：内部名作陈天师"),
+    "烦恼的应龙队员{gm02m21-炤": ("炤", "", "编者定：内部名作炤，并入炤"),
 }
 
 BOOK_ALIASES = config.ROOT / "data" / "annals" / "别名-塔卫二.md"
@@ -761,6 +764,7 @@ def register_operators(reg, operators):
         ch = reg.chars.get(key) or Character(key, "operator")
         ch.kind, ch.game = "operator", "endfield"
         ch.rarity, ch.profession, ch.appellation = op["rarity"], op["profession"], op["appellation"]
+        ch.char_ids = list(op["ids"])  # 立绘和头像按 id 取（pipeline.images）
         ch.profile = op.get("profile")
         reg.chars[key] = ch
 

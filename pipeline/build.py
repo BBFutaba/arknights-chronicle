@@ -69,6 +69,9 @@ def main():
     from . import annals
     print("编年史：")
     annals.build()
+    # 立体时间轴的布局由 annals.json 算出，所以排在编年史之后
+    from . import timeline3d
+    timeline3d.build()
     print("在浏览器中查看：python -m pipeline.serve")
 
 
