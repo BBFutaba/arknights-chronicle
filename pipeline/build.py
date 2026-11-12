@@ -33,7 +33,7 @@ def main():
     if not config.STORY.exists():
         sys.exit("还没有游戏数据，请先运行：python -m pipeline.fetch")
     groups = gamedata.load_groups()
-    ef_groups, ef_audit = endfield.load()
+    ef_groups, ef_audit, ef_operators = endfield.load()
     groups.update(ef_groups)
     if args.list:
         for g in sorted(groups.values(), key=gamedata.sort_key):
@@ -41,8 +41,10 @@ def main():
         return
 
     reg = Registry()
+    endfield.register_operators(reg, ef_operators)
     built = {gid: [(endfield.analyze_episode if gid.startswith("ef_") else analyze_episode)(e, reg)
                    for e in g.episodes] for gid, g in groups.items()}
+    endfield.add_book_aliases(reg)
     events, prts_meta = chronicle.load_events(groups)
 
     if args.structured:

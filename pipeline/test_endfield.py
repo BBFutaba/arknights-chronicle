@@ -30,6 +30,10 @@ class EndfieldTests(unittest.TestCase):
             ("小橡{小祥}", "小橡", "小祥", "编者定"),
             ("塔塔{TA-TA原型机}", "TA-TA原型机", "塔塔", "编者定"),
             ("塔塔的幻影{TA-TA原型机}", "塔塔的幻影", "", "内部编号"),
+            ("喇叭广播{变声器伊冯}", "伊冯", "", "编者定"),
+            ("惊恐的男人{c33m1-杰弗里}", "杰弗里", "", "编者定"),
+            ("惊恐的男人{c99-某人}", "惊恐的男人", "", "内部编号"),
+            ("神色悲戚的天师{e10m3-神色悲戚的天师}", "赵叔", "", "编者定"),
             ("峰{沈峤峨}", "沈峤峨", "峰", "两侧姓名"),
             ("莱万汀&管理员{莱万汀、管理员}", "莱万汀&管理员", "", "群体或扮演"),
             ("伊冯{伊冯}", "伊冯", "", "同名"),
@@ -148,7 +152,40 @@ class EndfieldTests(unittest.TestCase):
 
     def test_optional_local_data(self):
         with patch.object(config, "ENDFIELD", config.ROOT / "__missing_endfield_client__"):
-            self.assertEqual(endfield.load(), ({}, {}))
+            self.assertEqual(endfield.load(), ({}, {}, {}))
+
+    def test_operator_profiles_keep_paragraphs(self):
+        self.assertEqual(endfield.clean("甲<br>乙\\n  丙 <color=#fff>丁</color>", breaks=True), "甲\n乙\n丙 丁")
+        self.assertEqual(endfield.clean("甲\\n乙"), "甲 乙")
+        self.assertEqual(endfield.parse_basic("【代号】莱万汀 【性别】女\n【综合体检测试】\n生理强度：优良\n作战技巧：标准"),
+                         {"代号": "莱万汀", "性别": "女", "综合体检测试": "生理强度：优良 作战技巧：标准"})
+        loader = object.__new__(endfield.Loader)
+        loader.operators = {}
+
+        def rec(i, title, desc):
+            return {"recordIndex": i, "recordTitle": title, "recordDesc": desc}
+        loader.tables = {
+            "CharProfessionTable": {"0": {"profession": "GUARD", "name": "近卫"}},
+            "CharacterTable": {
+                "chr_0002_endminm": {"name": "管理员", "rarity": 6, "profession": "GUARD", "engName": "Endministrator",
+                                     "profileRecord": [rec(1, "基础档案", "【性别】男 【种族】■■"),
+                                                       rec(2, "人事简述", "他是管理员。"), rec(3, "档案资料·一", "同文")]},
+                "chr_0003_endminf": {"name": "管理员", "rarity": 6, "profession": "GUARD",
+                                     "profileRecord": [rec(1, "基础档案", "【性别】女 【种族】■■"),
+                                                       rec(2, "人事简述", "她是管理员。"), rec(3, "档案资料·一", "同文")]},
+            },
+        }
+        loader.load_operators()
+        op = loader.operators["管理员"]
+        self.assertEqual((op["ids"], op["rarity"], op["profession"], op["appellation"]),
+                         (["chr_0002_endminm", "chr_0003_endminf"], 6, "近卫", "Endministrator"))
+        self.assertEqual(op["profile"]["basic"], {"性别": "男／女", "种族": "■■"})
+        self.assertEqual([s["title"] for s in op["profile"]["sections"]], ["人事简述（男）", "人事简述（女）", "档案资料·一"])
+        reg = SimpleNamespace(chars={"终末地·管理员": Character("终末地·管理员", "npc")})
+        endfield.register_operators(reg, loader.operators)
+        ch = reg.chars["终末地·管理员"]
+        self.assertEqual((ch.kind, ch.game, ch.profession), ("operator", "endfield", "近卫"))
+        self.assertEqual(ch.profile["sections"][2]["text"], "同文")
 
     def test_main_acts_use_numeric_order(self):
         groups = [endfield.Group(f"ef_main_e{n}", str(n), "终末地·主线", None) for n in [10, 2, 1]]

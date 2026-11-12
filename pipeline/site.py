@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from itertools import combinations
 
-from . import config, gamedata, profiles
+from . import config, endfield, gamedata, profiles
 from .analyze import EpisodeData
 from .chronicle import Event
 from .entities import Registry
@@ -96,7 +96,9 @@ class SiteExporter:
             for l in d.script.lines:
                 k = LINE_KIND[l.kind]
                 speaker = l.speaker or ""
-                if getattr(g, "game", "") == "endfield" and "终末地·" + speaker in self.reg.chars:
+                # 别名表里的说话人照旧显示原称，网页按人物页的别名连到正名
+                if getattr(g, "game", "") == "endfield" and \
+                        "终末地·" + endfield.book_aliases().get(speaker, speaker) in self.reg.chars:
                     speaker = "终末地·" + speaker
                 lines.append([k, speaker, l.options if k == "c" else l.text])
             out[d.ep.story_id] = {"lines": lines, "backgrounds": d.script.backgrounds}
@@ -129,7 +131,9 @@ class SiteExporter:
             }
             if getattr(c, "game", "") == "endfield":
                 entry["game"] = "endfield"
-            if c.kind == "operator":
+                if getattr(c, "profile", None):
+                    entry["profile"] = c.profile
+            elif c.kind == "operator":
                 entry["profile"] = profiles.operator_profile(c)
             elif desc := profiles.npc_description(n):
                 entry["description"] = desc

@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from . import annals as a
+from . import annals as a, endfield
 from .config import ROOT
 
 
@@ -39,10 +39,12 @@ class BianTests(unittest.TestCase):
             p = patch.object(a, name, value)
             p.start()
             self.addCleanup(p.stop)
-        a.aliases.cache_clear()
-        a.sup_ids.cache_clear()
-        self.addCleanup(a.aliases.cache_clear)
-        self.addCleanup(a.sup_ids.cache_clear)
+        p = patch.object(endfield, "BOOK_ALIASES", self.src / "别名-塔卫二.md")
+        p.start()
+        self.addCleanup(p.stop)
+        for fn in (a.aliases, a.sup_ids, endfield.book_aliases):
+            fn.cache_clear()
+            self.addCleanup(fn.cache_clear)
         self.write("塔卫二前纪/c.md", self.entry("失年", "塔不书"))
         self.write("塔卫二前纪/b.md", self.entry("旧事", "塔142", " 是岁:塔卫二"))
         self.write("塔卫二前纪/a.md", self.entry("历前", "塔前"))
@@ -130,6 +132,25 @@ class BianTests(unittest.TestCase):
         self.assertEqual(len(probs.notes), 1)
         self.assertEqual(a.person_links("[[佩丽卡]]", a.TERRA, probs, "fixture"), "[[佩丽卡]]")
         self.assertFalse(probs)
+
+    def test_talos_aliases_and_profiles(self):
+        self.write("别名-塔卫二.md", "<!-- 说明里的 甲=乙 不算 -->\n卡特洛=狼卫  # 洛茜称兄\n不存在=没这人\n")
+        endfield.book_aliases.cache_clear()
+        self.assertEqual(endfield.book_aliases(), {"卡特洛": "狼卫", "不存在": "没这人"})
+        probs = a.Problems()
+        self.assertEqual(a.person_links("[[卡特洛]]见[[狼卫]]", a.TALOS, probs, "fixture"),
+                         "[[终末地·狼卫|卡特洛]]见[[终末地·狼卫]]")
+        self.assertFalse(probs, probs)
+        a.check_ef_aliases(probs)
+        self.assertTrue(any("没有终末地人物页" in p for p in probs), probs)
+        # 终末地干员档案：@档 先找终末地人物，按原文分段
+        sec = a.characters()["终末地·莱万汀"]["profile"]["sections"][1]
+        first, last = sec["text"].split("\n")[1][:6], sec["text"].split("\n")[2][-6:]
+        probs = a.Problems()
+        q = a.profile_quote(f"莱万汀 {sec['title']} 「{first}」…「{last}」", "fixture", probs, a.TALOS)
+        self.assertFalse(probs, probs)
+        self.assertEqual((q["name"], q["label"], len(q["paras"])),
+                         ("终末地·莱万汀", f"莱万汀干员档案 · {sec['title']}", 2))
 
     def test_all_talos_date_forms_and_ties(self):
         for spec, expected in (("塔152", "152 年"), ("塔152-春", "152 年 春季"),
@@ -282,7 +303,9 @@ assert.equal(doc.querySelector('.g-bian').value, '塔卫二编');
 assert(graph.collect().nodes.has('char:终末地·佩丽卡'));
 graph.update(route());
 assert(![...graph.collect().nodes.keys()].some((id) => id.startsWith('char:终末地·')));
-assert(!D.charAlias['终末地·峰']);
+// 「峰」原指沈骄峨、沈峤峨两页，别名-塔卫二.md 并成一页后只指沈骄峨
+assert.equal(D.charAlias['终末地·峰'], '终末地·沈骄峨');
+assert.equal(D.charAlias['终末地·联络员菲奥娜'], '终末地·菲奥娜');
 assert.match(fs.readFileSync(path.join(root, 'site/style.css'), 'utf8'), /\.bian-talos \.game-mark\s*\{\s*display:\s*none/);
 D.annals.volumes = D.annals.volumes.filter((v) => v.bian === '泰拉编');
 annals.mount(annalsEl, route(null, ['1097']));

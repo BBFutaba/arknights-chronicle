@@ -32,9 +32,13 @@ SNS 按 nextContentId/optionNextContentId。跨场景顺序不能从编号假定
 
 所有人物页键均为「终末地·整理后的名字」，不套用明日方舟别名/势力/博士规则。
 剧本和出场使用整理后的说话人；审计表保留原写法，别名仅在终末地命名空间内使用。
+编者的别名表 data/annals/别名-塔卫二.md（book_aliases）再把说话人并到正名的人物页，
+剧本里照旧显示原称。CharacterTable 里的可操作干员（load_operators）先登记成干员页，
+带职业、星级、英文代号和按原文分段的档案，供人物页和 @档 用。
 """
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
+from functools import cache
 import csv
 import html
 import json
@@ -63,7 +67,37 @@ SPEAKER_FIX = {
     "小橡{小祥": ("小橡", "小祥", "编者定：画面与庄方宜都作小橡，取前称，内部名为别名"),
     # 内部名带字母，按规则 1 会当成编号；它其实就是取名以前的说话人名
     "塔塔{TA-TA原型机": ("TA-TA原型机", "塔塔", "编者定：陈千语为原型机取名塔塔，并为一人"),
+    # 后半「变声器伊冯」按规则 4 当成泛称；喇叭广播又是泛称，不能用别名表全局并入伊冯
+    "喇叭广播{变声器伊冯": ("伊冯", "", "编者定：伊冯用变声器广播，并入伊冯"),
+    # 后半是同一个内部编号，前称是泛称：按规则 1 会各成一页，其实是一个人（按原写法逐条定，不全局并）
+    "惊恐的男人{c33m1-杰弗里": ("杰弗里", "", "编者定：内部名同作 c33m1-杰弗里，并入杰弗里"),
+    "模糊的男声{c33m1-杰弗里": ("杰弗里", "", "编者定：内部名同作 c33m1-杰弗里，并入杰弗里"),
+    "史尔特尔的声音{c16-史尔特尔": ("史尔特尔", "", "编者定：内部名同作 c16-史尔特尔，并入史尔特尔"),
+    "神色悲戚的天师{e10m3-神色悲戚的天师": ("赵叔", "", "编者定：庄方宜当面称他赵叔，以赵叔为正名"),
 }
+
+BOOK_ALIASES = config.ROOT / "data" / "annals" / "别名-塔卫二.md"
+
+
+@cache
+def book_aliases():
+    """塔卫二编的别名表：每行「别名=正名」，两边都不带「终末地·」。剧本里说话人是别名的，
+    台词和出场算到正名的人物页，剧本里照旧显示原称；书里写 [[别名]] 也连到正名。"""
+    out = {}
+    text = BOOK_ALIASES.read_text(encoding="utf-8") if BOOK_ALIASES.exists() else ""
+    for raw in re.sub(r"<!--.*?-->", "", text, flags=re.S).splitlines():
+        if "=" in raw and not raw.startswith("#"):
+            a, _, c = raw.partition("=")
+            out[a.strip()] = c.split("#", 1)[0].strip()
+    return out
+
+
+def add_book_aliases(reg):
+    """别名记到正名的人物页上（人物页「又名」、网页按别名找人都靠它）。"""
+    for alias, target in book_aliases().items():
+        ch = reg.chars.get(PREFIX + target)
+        if ch and PREFIX + alias not in ch.aliases:
+            ch.aliases.append(PREFIX + alias)
 
 
 def speaker_name(raw):
@@ -106,7 +140,11 @@ def natural(value):
                  for x in re.split(r"(\d+)", str(value)))
 
 
-def clean(text):
+def clean(text, breaks=False):
+    """breaks=True 时保留原文分段（干员档案用），每段照常清理。"""
+    if breaks:
+        text = re.sub(r"<br\s*/?>|\\n", "\n", html.unescape(text or ""), flags=re.I)
+        return "\n".join(p for p in (clean(s) for s in text.split("\n")) if p)
     text = html.unescape(text or "")
     text = text.replace("{F}", "〔女〕").replace("{M}", "〔男〕")
     for token in ("{@nickname}", "{nickname}", "{playerName}", "{player}"):
@@ -121,6 +159,12 @@ def clean(text):
     text = re.sub(r"<br\s*/?>|\\n", " ", text, flags=re.I)
     text = re.sub(r"</?(?:color|size|b|i|u|s|alpha|align|line-height|link)(?:[= ][^>]*)?>|<[@#][^>]+>|</>", "", text, flags=re.I)
     return re.sub(r"\s+", " ", text).strip()
+
+
+def parse_basic(text):
+    """「【代号】莱万汀 【性别】女 …」→ {"代号": "莱万汀", "性别": "女", …}；栏内分段并成一行。"""
+    parts = re.split(r"【([^】]+)】", text)
+    return {k.strip(): re.sub(r"\s+", " ", v).strip() for k, v in zip(parts[1::2], parts[2::2])}
 
 
 def walk(value, path=""):
@@ -160,6 +204,7 @@ class Loader:
         self.texts = self.table("TextTable")
         self.groups = {}
         self.audit = {"source_build": root.name, "uncertain": [], "excluded": [], "missing": [], "timelines": {}}
+        self.operators = {}  # 干员名 → {ids, rarity, profession, appellation, profile}，见 load_operators
         self.assets = {}
         inventory = root.parent.parent / "inventory/client_ab_assets.tsv"
         if inventory.exists():
@@ -195,15 +240,15 @@ class Loader:
             self.tables[name] = self.read(p) if p.exists() else {}
         return self.tables[name]
 
-    def text(self, value):
+    def text(self, value, breaks=False):
         if isinstance(value, dict):
             if "key" in value:
-                return self.text(self.texts.get(value["key"], {}))
+                return self.text(self.texts.get(value["key"], {}), breaks)
             ident = str(value.get("id", 0))
             if ident != "0" and ident not in self.i18n:
                 self.audit["missing"].append("I18n:" + ident)
-            return clean(self.i18n.get(ident, value.get("text", "")))
-        return clean(value) if isinstance(value, str) else ""
+            return clean(self.i18n.get(ident, value.get("text", "")), breaks)
+        return clean(value, breaks) if isinstance(value, str) else ""
 
     def objects(self, asset):
         """只读清单定位的结构化对象；.strings/.allstrings 均不当作正文。"""
@@ -499,6 +544,38 @@ class Loader:
             self.add(g, key, "讯息 · " + key, lines, source="TableCfg/SNSDialogTable.json/" + key,
                      note="按消息连接展开全部选项；与任务场景的相互触发先后未合并。", avg="讯息")
 
+    def load_operators(self):
+        """可操作的干员：人物页标作干员，带稀有度、职业、英文代号和档案。档案保留原文分段，
+        供 @档 引用；基础档案拆成栏目。同名的几个 id（男女管理员）同栏文字相同的只留一份，
+        不同的在栏目名后注明性别；基础档案同一栏目取值不同的用「／」并列。"""
+        professions = {r.get("profession"): self.text(r.get("name"))
+                       for r in self.table("CharProfessionTable").values()}
+        records = defaultdict(list)  # 干员名 → [(性别, 栏目, 文字)]
+        basics = defaultdict(lambda: defaultdict(list))  # 干员名 → 栏目 → [取值]
+        for cid, row in sorted(self.table("CharacterTable").items(), key=lambda x: natural(x[0])):
+            name = self.text(row.get("name")) or cid
+            op = self.operators.setdefault(name, {"ids": [], "rarity": 0, "profession": "", "appellation": ""})
+            op["ids"].append(cid)
+            op["rarity"] = max(op["rarity"], int(row.get("rarity") or 0))
+            op["profession"] = op["profession"] or professions.get(row.get("profession"), "")
+            op["appellation"] = op["appellation"] or row.get("engName") or ""
+            texts = [(self.text(r.get("recordTitle")), self.text(r.get("recordDesc"), breaks=True))
+                     for r in sorted(row.get("profileRecord", []), key=lambda x: x["recordIndex"])]
+            basic = parse_basic(next((t for title, t in texts if title == "基础档案"), ""))
+            for k, v in basic.items():
+                if v not in basics[name][k]:
+                    basics[name][k].append(v)
+            records[name] += [(basic.get("性别", ""), title, t) for title, t in texts if t and title != "基础档案"]
+        for name, recs in records.items():
+            by_title = defaultdict(dict)
+            for sex, title, t in recs:
+                by_title[title].setdefault(re.sub(r"\s", "", t), (sex, t))
+            sections = [{"title": f"{title}（{sex or i + 1}）" if len(variants) > 1 else title, "text": t}
+                        for title, variants in by_title.items()
+                        for i, (sex, t) in enumerate(variants.values())]
+            self.operators[name]["profile"] = {"basic": {k: "／".join(v) for k, v in basics[name].items()},
+                                               "sections": sections}
+
     def load_narrative(self):
         rich = self.table("RichContentTable")
         categories = self.table("PrtsCategory")
@@ -530,6 +607,7 @@ class Loader:
                          source="TableCfg/RichContentTable.json/" + cid, avg="文献")
                 used.add(cid)
         self.audit["excluded"].append({"kind": "未被 PRTS/终端引用的 RichContent", "ids": sorted(set(rich) - used), "reason": "含玩法说明/测试或来源不明内容，待逐项判定"})
+        self.load_operators()
         for cid, row in self.table("CharacterTable").items():
             name = self.text(row.get("name")) or cid
             g = self.group("profiles", "干员档案", "干员档案")
@@ -657,10 +735,12 @@ def analyze_episode(ep, reg):
         raw = "管理员" if line.kind == "decision" else line.speaker if line.kind == "dialogue" else None
         if not raw or re.fullmatch(r"[？?…·.\s]+", raw):
             continue
-        name = PREFIX + raw
+        name = PREFIX + book_aliases().get(raw, raw)  # 别名表里的人：台词算到正名，剧本照旧显示原称
         if name not in reg.chars:
             reg.chars[name] = Character(name, "npc")
             reg.chars[name].game = "endfield"
+        if name != PREFIX + raw and PREFIX + raw not in reg.chars[name].aliases:
+            reg.chars[name].aliases.append(PREFIX + raw)
         for alias, target in aliases.items():
             if target == raw and PREFIX + alias not in reg.chars[name].aliases:
                 reg.chars[name].aliases.append(PREFIX + alias)
@@ -674,13 +754,25 @@ def analyze_episode(ep, reg):
     return d
 
 
+def register_operators(reg, operators):
+    """可操作干员先登记成「终末地·名」的干员页（带档案），剧本里同名的说话人之后并入这一页。"""
+    for name, op in operators.items():
+        key = PREFIX + name
+        ch = reg.chars.get(key) or Character(key, "operator")
+        ch.kind, ch.game = "operator", "endfield"
+        ch.rarity, ch.profession, ch.appellation = op["rarity"], op["profession"], op["appellation"]
+        ch.profile = op.get("profile")
+        reg.chars[key] = ch
+
+
 def load():
+    """返回（剧情组，审计，可操作干员）。"""
     if not (config.ENDFIELD / "TableCfg/I18nTextTable_CN.json").exists():
         print("终末地：未发现本机客户端数据，跳过。")
-        return {}, {}
+        return {}, {}, {}
     loader = Loader(config.ENDFIELD)
     groups = loader.load()
-    return groups, loader.audit
+    return groups, loader.audit, loader.operators
 
 
 def raw_texts():

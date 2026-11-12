@@ -28,8 +28,8 @@ site/data/bowu.json（网页「博物志」页用），只含编者文字和条�
 塔卫二编独立使用塔罗斯历，不与泰拉历换算：塔152/ 一年一卷，塔卫二前纪/ 收元年前及一五二年前的事。
 条目写 @条 补:名称 系:塔152[-春|-03|-03-14|-02~04]；仅知年份配 是岁:地区。
 前纪另可写 系:塔前（塔罗斯历以前）、系:塔不书（年份不书），不必写 次:ev编号。
-前纪按年、月季、文件名、文件内先后排列。[[佩丽卡]]、传:佩丽卡、@传 佩丽卡 优先用终末地人物；
-明确指向泰拉写 [[泰拉·赫拉格]]。列传、列传索引、纪事本末、本末索引各用同名加 -塔卫二.md 的文件。
+前纪按年、月季、文件名、文件内先后排列。[[佩丽卡]]、传:佩丽卡、@传 佩丽卡、@档 佩丽卡 优先用终末地人物，
+先查 别名-塔卫二.md（[[卡特洛]] 连到狼卫，字面不变）；明确指向泰拉写 [[泰拉·赫拉格]]。列传、列传索引、纪事本末、本末索引各用同名加 -塔卫二.md 的文件。
 塔卫二本末只靠条目的 事: 收录，不用 @线/@加/@减。annals.json 的卷、条目、列传、本末均带 bian。
 
     python -m pipeline.annals show <分集id> [起 止]   带行号列出剧本
@@ -54,6 +54,7 @@ from pathlib import Path
 
 from . import config
 from .config import ROOT, SITE_DATA
+from .endfield import book_aliases as ef_aliases
 
 SRC_DIR = ROOT / "data" / "annals"
 OUT_DIR = ROOT / "annals"
@@ -94,12 +95,11 @@ def volume_bian(vol) -> str:
 def person_name(name: str, bian: str, probs: Problems, where: str) -> str:
     if bian == TERRA:
         return canon(name)
+    ef = "终末地·" + ef_aliases().get(name.removeprefix("终末地·"), name.removeprefix("终末地·"))
     if name.startswith("泰拉·"):
         target = canon(name.removeprefix("泰拉·"))
-    elif name.startswith("终末地·"):
-        target = name
-    elif "终末地·" + name in characters():
-        target = "终末地·" + name
+    elif name.startswith("终末地·") or ef in characters():
+        target = ef
     else:
         target = canon(name)
         if target in characters():
@@ -112,8 +112,15 @@ def person_name(name: str, bian: str, probs: Problems, where: str) -> str:
 def person_links(text: str, bian: str, probs: Problems, where: str) -> str:
     if bian == TERRA:
         return text
-    return re.sub(r"\[\[([^\]|]+)(\|[^\]]*)?\]\]",
-                  lambda m: "[[" + person_name(m[1], bian, probs, where) + (m[2] or "") + "]]", text)
+
+    def link(m):
+        target = person_name(m[1], bian, probs, where)
+        written = m[1].removeprefix("终末地·").removeprefix("泰拉·")
+        # 写的是别名：连到正名，字面照旧显示写下的名字
+        label = m[2] or ("|" + written if target.removeprefix("终末地·") != written and
+                         not target.startswith("泰拉") and ef_aliases().get(written) else "")
+        return "[[" + target + label + "]]"
+    return re.sub(r"\[\[([^\]|]+)(\|[^\]]*)?\]\]", link, text)
 
 
 @cache
@@ -280,14 +287,15 @@ def story_quote(args: str, where: str, probs: Problems) -> dict | None:
     return {"type": "story", "sid": sid, "label": episode_label(sid), "ranges": ranges, "blocks": blocks, "chars": chars}
 
 
-def profile_quote(args: str, where: str, probs: Problems) -> dict | None:
-    """@档 → {type, name, section, label, paras}。"""
+def profile_quote(args: str, where: str, probs: Problems, bian: str = TERRA) -> dict | None:
+    """@档 → {type, name, section, label, paras}。塔卫二编里先找终末地人物（同 [[名]]）。"""
     m = re.match(r"(\S+)\s+(\S+)\s+(.*)$", args)
     if not m:
         probs.add(where, f"@档 格式不对：{args}")
         return None
     name, section, rest = m.groups()
-    ch = characters().get(canon(name))
+    key = person_name(name, bian, probs, where) if bian == TALOS else canon(name)
+    ch = characters().get(key)
     secs = {s["title"]: s["text"] for s in (ch or {}).get("profile", {}).get("sections", [])} if ch else {}
     if section not in secs and f"{name}·{section}" in secs:  # 合并进来的另一身份，栏目名前加了名字
         section = f"{name}·{section}"
@@ -309,7 +317,10 @@ def profile_quote(args: str, where: str, probs: Problems) -> dict | None:
     if len(excerpt) > MAX_CHARS:
         probs.add(where, f"{name}「{section}」引文偏长（{len(excerpt)} 字）")
     paras = [p for p in excerpt.split("\n") if p.strip()]
-    return {"type": "profile", "name": name, "section": section, "label": f"{name}干员档案 · {section}",
+    if bian == TALOS:  # 链接用人物页的键，署名去掉「终末地·」
+        name = key
+    shown = name.removeprefix("终末地·")
+    return {"type": "profile", "name": name, "section": section, "label": f"{shown}干员档案 · {section}",
             "paras": paras, "chars": len(excerpt)}
 
 
@@ -671,7 +682,8 @@ def parse_groups(e: Entry, probs: Problems) -> list[dict]:
                 g["kaoyi"].append({"li": False, "text": rest})
             continue
         if s.startswith("@引 ") or s.startswith("@档 "):
-            q = (story_quote if s.startswith("@引") else profile_quote)(s[3:].strip(), where, probs)
+            q = (story_quote(s[3:].strip(), where, probs) if s.startswith("@引")
+                 else profile_quote(s[3:].strip(), where, probs, e.bian))
             if q:
                 g["quotes"].append(q)
         elif field == "考异":
@@ -858,6 +870,19 @@ def benmo_members(b: dict, entries: list[Entry]) -> list[Entry]:
 
 
 # ---------------------------------------------------------------- 列传
+
+
+def check_ef_aliases(probs: Problems):
+    """别名-塔卫二.md：正名要有人物页，别名不能自己另成一页，也不能连环。"""
+    table = ef_aliases()
+    for a, c in table.items():
+        where = f"别名-塔卫二.md：{a}={c}"
+        if "终末地·" + c not in characters():
+            probs.add(where, f"正名「{c}」没有终末地人物页")
+        if "终末地·" + a in characters():
+            probs.add(where, f"别名「{a}」还另有一页，没有并进「{c}」")
+        if c in table:
+            probs.add(where, f"正名「{c}」本身又是别名")
 
 
 def load_renwu(probs: Problems) -> dict[str, str]:
@@ -1552,6 +1577,7 @@ def build(quiet: bool = False) -> int:
             probs.add(str(year), f"还没写的事件 {len(missing)} 条：{'、'.join(missing)}")
     liezhuan = load_liezhuan(probs)
     renwu = load_renwu(probs)
+    check_ef_aliases(probs)
     wu_notes: list[str] = []
     wu_items = load_wu(probs, wu_notes)
     no_intro: list[str] = []
