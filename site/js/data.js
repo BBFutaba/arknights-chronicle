@@ -96,7 +96,9 @@ function timelineRow(v, s, d, e, own) {
     ],
     chars: uniq([...names.map((n) => D.charAlias[n] ?? n), ...own.flatMap((p) => p.chars)]).filter((n) => D.chars[n]),
     powers: uniq([
-      ...Object.entries(D.powers).filter(([, p]) => p.name.length > 1 && text.includes(p.name)).map(([id]) => id),
+      // 塔卫二编的地区势力只在塔卫二编的条目里认（泰拉编也有「狼群」这样的词）
+      ...Object.entries(D.powers).filter(([, p]) => p.name.length > 1 && text.includes(p.name)
+        && (p.game !== 'endfield' || v.bian === BIANS[1])).map(([id]) => id),
       ...own.flatMap((p) => p.powers),
     ]),
   };

@@ -46,7 +46,7 @@ import re
 
 from . import config, gamedata
 from .analyze import EpisodeData
-from .entities import Character
+from .entities import Character, Power
 from .script import Line, Script
 
 PREFIX = "终末地·"
@@ -767,6 +767,87 @@ def register_operators(reg, operators):
         ch.char_ids = list(op["ids"])  # 立绘和头像按 id 取（pipeline.images）
         ch.profile = op.get("profile")
         reg.chars[key] = ch
+
+
+TALOS_BOWU = config.ROOT / "data" / "annals" / "博物志"
+TALOS_PEOPLE = config.ROOT / "data" / "annals" / "人物志" / "塔卫二.md"
+POWER_MEN = {"地理": "region", "势力": "faction"}
+# 塔卫二编博物志不另立、沿用泰拉编条目的地区势力（见 塔卫二-地理势力.md 开头的说明）
+SHARED_POWERS = {"罗德岛": "rhodes"}
+# 人物志里打头的名字修饰的不是这个人，不算入籍：人物 → 名字
+NOT_MEMBER = {
+    "终末地·德鲁安": "塞什卡",  # 「塞什卡血液样本的物流负责人」：塞什卡说的是血液样本，书里没写他是谁的人
+}
+
+
+def talos_power_entries():
+    """塔卫二编博物志地理、势力两门的条目：条目名 → (region|faction, 上级条目名, [别名])。"""
+    out = {}
+    for path in sorted(TALOS_BOWU.glob("塔卫二-*.md")):
+        for m in re.finditer(r"^@物 (\S+)(.*)$", path.read_text(encoding="utf-8"), re.M):
+            tags = dict(t.split(":", 1) for t in m[2].split() if ":" in t)
+            if tags.get("门") in POWER_MEN:
+                out[m[1]] = (POWER_MEN[tags["门"]], tags.get("上"), [a for a in tags.get("别", "").split(",") if a])
+    return out
+
+
+def identity_names(text, names):
+    """人物志一行的第一句身份（「本名…」一句跳过）里写到的地区势力名；重叠的取最长的。
+    名字要么打头（「联盟工团施工队长」），要么紧跟「的」（「北部禁区的大厨」），
+    「来自甚大裂隙彼岸」「藏身裂地者旧基地的难民」这类只是提到，不算。"""
+    clauses = [c for c in re.split(r"[，；。]", re.sub(r"\[\[([^\]|]+)(\|[^\]]*)?\]\]", r"\1", text)) if c]
+    first = next((c for c in clauses if not c.startswith("本名")), "")
+    hits = sorted(((m.start(), -len(n), n) for n in names for m in re.finditer(re.escape(n), first)))
+    out, end = [], 0
+    for start, neg, n in hits:
+        if start >= end:
+            end = start - neg
+            if start == 0 or first[end:end + 1] == "的":
+                out.append(n)
+    return out
+
+
+def register_powers(reg):
+    """塔卫二编的地区势力：取自塔卫二编博物志的地理、势力两门，id 作「ef_条目名」，上级照条目的「上:」。
+    干员按档案「身份认证」入籍（档案没写的看人物志），其他人物按人物志第一句身份里写到的名字；
+    只登记有人入籍的和它们的上级。名字只在塔卫二编里认：match 留空，泰拉剧本里的同名不算提及。"""
+    entries = talos_power_entries()
+    by_name = {}
+    for name, (_, _, aliases) in entries.items():
+        for n in (name, *aliases):
+            by_name.setdefault(n, name)
+
+    def pid_of(name):
+        if name in SHARED_POWERS:
+            return SHARED_POWERS[name] if SHARED_POWERS[name] in reg.powers else None
+        entry = by_name.get(name)
+        if not entry:
+            return None
+        node = entry
+        while node and "ef_" + node not in reg.powers:
+            kind, up, _ = entries[node]
+            p = Power("ef_" + node, node, kind, parent="ef_" + up if up in entries else None)
+            p.game = "endfield"
+            reg.powers[p.id] = p
+            node = up if up in entries else None
+        return "ef_" + entry
+
+    people = {}
+    if TALOS_PEOPLE.exists():
+        for line in re.sub(r"<!--.*?-->", "", TALOS_PEOPLE.read_text(encoding="utf-8"), flags=re.S).splitlines():
+            key, sep, desc = line.partition("：")
+            if sep and key.startswith(PREFIX):
+                people[key] = desc
+    names = [n for n in [*by_name, *SHARED_POWERS] if len(n) >= 2]
+    for key, ch in reg.chars.items():
+        if getattr(ch, "game", "") != "endfield":
+            continue
+        ident = ((getattr(ch, "profile", None) or {}).get("basic") or {}).get("身份认证", "")
+        found = [n for n in re.split(r"[／/、]", ident) if n in by_name or n in SHARED_POWERS]
+        pids = [p for n in (found or identity_names(people.get(key, ""), names))
+                if n != NOT_MEMBER.get(key) and (p := pid_of(n))]
+        ancestors = {a for p in pids for a in reg.ancestors(p)}  # 「裂地者碾骨氏族」只记碾骨氏族
+        ch.powers += [p for p in dict.fromkeys(pids) if p not in ancestors and p not in ch.powers]
 
 
 def load():

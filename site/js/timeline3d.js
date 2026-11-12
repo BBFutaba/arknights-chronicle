@@ -1,4 +1,5 @@
-// 立体时间轴：中轴是时间（z），同一时刻的事件散在横截面（x、y）上，关联近的靠在一起。
+// 立体时间轴：中轴是时间（z），竖着放，早的在上、晚的在下；同一时刻的事件散在横截面（x、y）上，关联近的靠在一起。
+// 镜头绕竖轴转（yaw）、俯仰（pitch），所以无论怎么转，时间轴在画面上总是上下方向。
 // 布局由 pipeline/timeline3d.py 预先算好，存在 data/timeline3d.json；这里只管画和操作。
 // 画法：手写的透视投影，画在 Canvas2D 上，不用第三方库（单文件版要离线可用）。
 // 颜色从 CSS 变量读，经一个探针元素换算成 rgb（color-mix 也认得），换主题后 retheme 重读。
@@ -8,7 +9,7 @@ import { esc, href, threadColor, charName } from './util.js';
 
 const R = 6;                          // 横向半径：布局归一后九成五的点在 1 以内，乘上它
 const NEAR = 0.5;                     // 离镜头比这近的不画
-const HOME = { yaw: -2.5, pitch: 0.42, dist: 26 };
+const HOME = { yaw: -2.5, pitch: 0.3, dist: 26 };
 const outExpo = (x) => (x >= 1 ? 1 : 1 - 2 ** (-10 * x));
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -167,7 +168,7 @@ function buildPoints() {
       id: e.id, e, li, x: x * R, y: y * R, z, thread, people, color,
       hollow: !color || Boolean(e.minor), bian: e.bian ?? BIANS[0],
       gang: (e.groups[0]?.gang ?? '').replace(/\*\*/g, ''), more: e.groups.length - 1,
-      rel: [], match: true,
+      rel: [], match: true, wake: li != null ? L.wake?.[li] ?? null : null,
     };
     P.push(p);
     prev = p;
@@ -227,11 +228,12 @@ function setup() {
     `<button data-z="${e.z0}" class="${e.bian === BIANS[1] ? 'talos' : ''}">${esc(/^\d+$/.test(e.label) ? `${e.label} 年` : e.title)}<span class="muted">${e.n}</span></button>`).join('');
   const cal = L.calendar;
   root.querySelector('.t3-read-body').innerHTML = `
-    <p><b>纵轴是时间</b>，从远古一直到塔罗斯历一五二年，但不按比例：${esc(L.scale.text)}</p>
+    <p><b>竖轴是时间</b>，从上往下，从远古一直到塔罗斯历一五二年，但不按比例：${esc(L.scale.text)}</p>
     <p><b>横向按关联远近</b>：共有的人物、纪事本末、故事线、地域越多，或考异里互相引用，就靠得越近；没有关联的散在轴外一圈。悬停一条，细线连到和它最相关的几条。</p>
-    <p><b>颜色</b>是故事线，和平面时间轴一样；空心方块是只有设定资料出处的条目和附记。</p>
+    <p><b>颜色</b>是故事线，和平面时间轴一样；空心圆是只有设定资料出处的条目和附记。</p>
     <p><b>没有年份的</b>放在虚线标出的区段：开头「年代不详」，泰拉编末尾「不系年」，塔卫二编里「塔罗斯历以前」「年份不书」。</p>
-    <p><b>两种历法</b>：泰拉编用泰拉历，塔卫二编用塔罗斯历。${esc(cal.note)}塔罗斯历元年处画一圈绿框，标着「${esc(cal.terra)}」。</p>`;
+    <p><b>两种历法</b>：泰拉编用泰拉历，塔卫二编用塔罗斯历。${esc(cal.note)}塔罗斯历元年处画一圈绿环，标着「${esc(cal.terra)}」。</p>
+    ${L.awakening ? `<p><b>管理员苏醒</b>是塔卫二编的起点，轴上画两圈绿环。${esc(L.awakening.note)}悬停时卡片上写明在苏醒之前还是之后。</p>` : ''}`;
   if (matchMedia('(min-width: 761px) and (min-height: 700px)').matches) root.querySelector('.t3-read').open = true;
 
   side.querySelector('.t3-bian').addEventListener('change', (ev) => setFilter({ bian: ev.target.value }));
@@ -261,9 +263,9 @@ function setup() {
     flyTo(cam.fz, { ...HOME });
   });
   root.querySelector('.t3-all').addEventListener('click', () => {
-    // 侧面看整根轴：可见宽度 = 距离 × 画面宽 / 焦距
+    // 侧面平视整根轴：可见高度 = 距离 × 画面高 / 焦距
     const F = Math.min(Math.max(W, H) * 0.75, Math.min(W, H) * 1.25);
-    flyTo(L.length / 2, { yaw: -Math.PI / 2, pitch: 0.3, dist: ((L.length + 10) * F) / Math.max(200, W - 120) });
+    flyTo(L.length / 2, { yaw: cam.yaw, pitch: 0, dist: ((L.length + 10) * F) / Math.max(200, H - 90) });
   });
   buildRail();
   bindPointer();
@@ -282,7 +284,8 @@ function buildRail() {
   const gaps = [...L.breaks.map((b) => `<i class="t3-rail-gap" style="top:${at(b.z0)};height:calc(${at(b.z1)} - ${at(b.z0)})"></i>`),
     ...L.bands.map((b) => `<i class="t3-rail-band" style="top:${at(b.z0 - 0.5)};height:calc(${at(b.z1 + 0.5)} - ${at(b.z0 - 0.5)})"></i>`)].join('');
   const cal = L.calendar.z != null ? `<i class="t3-rail-cal" style="top:${at(L.calendar.z)}" title="${esc(L.calendar.label)}：${esc(L.calendar.terra)}"></i>` : '';
-  rail.innerHTML = `<div class="t3-rail-track">${gaps}<i class="t3-rail-fill"></i>${eras}${cal}<i class="cross on t3-rail-mark"></i></div><div class="t3-rail-labels"></div>`;
+  const wake = L.awakening ? `<i class="t3-rail-cal t3-rail-wake" style="top:${at(L.awakening.z)}" title="${esc(L.awakening.label)}：${esc(L.awakening.when)}"></i>` : '';
+  rail.innerHTML = `<div class="t3-rail-track">${gaps}<i class="t3-rail-fill"></i>${eras}${cal}${wake}<i class="cross on t3-rail-mark"></i></div><div class="t3-rail-labels"></div>`;
   placeRailLabels();
 }
 
@@ -305,6 +308,10 @@ function placeRailLabels() {
     const y = ((L.calendar.z - zMin()) / span) * h;
     if (!placed.some((p) => Math.abs(p - y) < 13)) out.push(`<span class="cal" style="top:${y}px">塔元年</span>`);
   }
+  if (L.awakening) {
+    const y = ((L.awakening.z - zMin()) / span) * h;
+    if (!placed.some((p) => Math.abs(p - y) < 13)) out.push(`<span class="cal" style="top:${y}px">苏醒</span>`);
+  }
   box.innerHTML = out.join('');
 }
 
@@ -323,10 +330,13 @@ function setHud() {
   const brk = L.breaks.find((b) => cam.fz > b.z0 + 0.5 && cam.fz < b.z1 - 0.5);
   const band = L.bands.find((b) => cam.fz >= b.z0 - 1 && cam.fz <= b.z1 + 1);
   const cal = L.calendar.z != null && Math.abs(cam.fz - L.calendar.z) < 4;
+  const wake = L.awakening && Math.abs(cam.fz - L.awakening.z) < 2.5;
   const big = brk ? '断开' : era.label;
   const lines = brk ? [brk.label, '泰拉历之后接塔罗斯历'] : [
     /^塔?\d+$/.test(era.label) ? p.e.when : `${era.title.split(' · ').pop()} · ${p.e.when}`,
-    band ? `${band.label}：${band.note}` : cal ? `${L.calendar.label}：${L.calendar.terra}` : era.bian,
+    band ? `${band.label}：${band.note}` : cal ? `${L.calendar.label}：${L.calendar.terra}`
+      : wake ? `${L.awakening.label}：此前 ${L.awakening.before} 条，此后 ${L.awakening.after} 条`
+      : p.wake && p.bian === BIANS[1] ? `${era.bian} · ${p.wake}` : era.bian,
   ];
   const html = `<b>${esc(big)}</b>${lines.map((l) => `<span>${esc(l)}</span>`).join('')}`;
   if (html === lastHud) return;
@@ -456,12 +466,13 @@ function basis() {
   const F = Math.min(Math.max(W, H) * 0.75, Math.min(W, H) * 1.25);
   // 雾：离镜头比焦点远出这么多以后渐隐
   const fogStart = cam.dist * 0.9, fogLen = Math.max(28, cam.dist * 1.7);
-  return { C: [ox, oy, cam.fz + oz], f, r, u, F, cx: W / 2, cy: H / 2, fogStart, fogLen };
+  // 世界坐标：横截面 (x, y) 是水平面 (X, Z)，时间 z 朝下 (Y = -z)；C 是镜头位置
+  return { C: [ox, -cam.fz + oy, oz], f, r, u, F, cx: W / 2, cy: H / 2, fogStart, fogLen };
 }
 
 const out = { x: 0, y: 0, d: 0 };
 function proj(x, y, z) {
-  const dx = x - B.C[0], dy = y - B.C[1], dz = z - B.C[2];
+  const dx = x - B.C[0], dy = -z - B.C[1], dz = y - B.C[2];
   const d = dx * B.f[0] + dy * B.f[1] + dz * B.f[2];
   if (d < NEAR) return false;
   out.x = B.cx + ((dx * B.r[0] + dy * B.r[1] + dz * B.r[2]) / d) * B.F;
@@ -592,74 +603,74 @@ function drawPoints() {
     const s = ps[k], x = px[k], y = py[k];
     ctx.globalAlpha = a;
     if (p.hollow) {
+      dot(x, y, s);
       ctx.fillStyle = pal.bg;
-      ctx.fillRect(x - s, y - s, s * 2, s * 2);
+      ctx.fill();
+      dot(x, y, s - 0.5);
       ctx.strokeStyle = p.color ?? pal.lore;
       ctx.lineWidth = s > 2.5 ? 1.4 : 1;
-      ctx.strokeRect(x - s + 0.5, y - s + 0.5, s * 2 - 1, s * 2 - 1);
+      ctx.stroke();
     } else {
+      dot(x, y, s);
       ctx.fillStyle = p.color;
-      ctx.fillRect(x - s, y - s, s * 2, s * 2);
+      ctx.fill();
       if (s > 2.2 && p.match) {
+        dot(x, y, s + 0.5);
         ctx.strokeStyle = pal.bg;
         ctx.lineWidth = 1;
-        ctx.strokeRect(x - s - 0.5, y - s - 0.5, s * 2 + 1, s * 2 + 1);
+        ctx.stroke();
       }
     }
   }
   ctx.globalAlpha = 1;
 }
 
-// 每卷开头一个横截面的四个角（裁切角标）；塔罗斯历元年是一整圈绿框
+// 圆点：半径 r 的路径，调用方自己 fill 或 stroke
+function dot(x, y, r) {
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(0.5, r), 0, Math.PI * 2);
+}
+
+// 横截面上半径 S 的一圈，投影成椭圆；在镜头后面的那段断开
+function ring(z, S) {
+  ctx.beginPath();
+  let first = true, n = 0;
+  for (let i = 0; i <= 64; i++) {
+    const t = (i / 64) * Math.PI * 2;
+    if (!proj(Math.cos(t) * S, Math.sin(t) * S, z)) { first = true; continue; }
+    if (first) ctx.moveTo(out.x, out.y); else ctx.lineTo(out.x, out.y);
+    first = false;
+    n++;
+  }
+  return n > 1;
+}
+
+// 每卷开头一个横截面的圆环；塔罗斯历元年是一圈绿环，管理员苏醒是两圈
 function drawFrames(labels) {
-  const S = R * 1.18, arm = S * 0.22;
-  const corners = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
+  const S = R * 1.18;
   ctx.lineWidth = 1;
   for (const e of L.eras) {
     const z = e.z0 - 0.6;
     if (!proj(0, 0, z)) continue;
     const a = fog(out.d);
     if (a <= 0.03) continue;
-    // 四个角都在镜头前才画，免得一条边穿到镜头后面
-    const pts = [];
-    for (const [sx, sy] of corners) {
-      if (!proj(sx * S, sy * S, z)) break;
-      pts.push([out.x, out.y]);
-    }
-    if (pts.length < 4) continue;
+    if (!ring(z, S)) continue;
     ctx.globalAlpha = a * 0.55;
     ctx.strokeStyle = pal.line;
-    ctx.beginPath();
-    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-    ctx.closePath();
-    ctx.stroke();
-    ctx.globalAlpha = a * 0.9;
-    ctx.strokeStyle = pal.text;
-    ctx.beginPath();
-    for (const [sx, sy] of corners) {
-      if (!proj(sx * S - sx * arm, sy * S, z)) continue;
-      ctx.moveTo(out.x, out.y);
-      if (!proj(sx * S, sy * S, z)) continue;
-      ctx.lineTo(out.x, out.y);
-      if (!proj(sx * S, sy * S - sy * arm, z)) continue;
-      ctx.lineTo(out.x, out.y);
-    }
     ctx.stroke();
   }
-  const cz = L.calendar.z;
-  if (cz != null && proj(0, 0, cz - 0.7)) {
+  const marks = [];
+  if (L.calendar.z != null) marks.push([L.calendar.z - 0.7, [S]]);
+  if (L.awakening) marks.push([L.awakening.z - 0.35, [S, S * 0.9]]);
+  for (const [z, radii] of marks) {
+    if (!proj(0, 0, z)) continue;
     const a = fog(out.d);
-    if (a > 0.03) {
-      ctx.globalAlpha = a;
+    if (a <= 0.03) continue;
+    ctx.globalAlpha = a;
+    for (const S1 of radii) {
+      if (!ring(z, S1)) continue;
       ctx.strokeStyle = pal.lime;
       ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      let first = true;
-      for (const [sx, sy] of [...corners, corners[0]]) {
-        if (!proj(sx * S, sy * S, cz - 0.7)) { first = true; continue; }
-        if (first) ctx.moveTo(out.x, out.y); else ctx.lineTo(out.x, out.y);
-        first = false;
-      }
       ctx.stroke();
       ctx.lineWidth = 1;
       ctx.strokeStyle = pal.text;
@@ -731,7 +742,7 @@ function drawAxis(axis, labels) {
     ctx.lineTo(x + nx * l, y + ny * l);
     ctx.stroke();
     if (eraStart.has(`${z}|${label}`)) continue;  // 卷首的年份由卷名标出
-    if (kind === 'year') labels.push({ pri: 4, x, y, d: out.d, a, text: label, style: 'year', off: 20, side: 1 });
+    if (kind === 'year') labels.push({ pri: 4, x, y, d: out.d, a, text: wakeTick(label), style: 'year', off: 20, side: 1 });
     else if (kind === 'sec') labels.push({ pri: 3, x, y, d: out.d, a, text: label, style: 'sec', off: 13, side: -1 });
     else labels.push({ pri: 2, x, y, d: out.d, a, text: label, style: 'day', off: 13, side: -1 });
   }
@@ -774,12 +785,23 @@ function drawAxis(axis, labels) {
     const a = fog(out.d);
     if (a > 0.05) labels.push({ pri: 8, x: out.x, y: out.y, d: out.d, a, text: L.calendar.label, sub: L.calendar.terra, style: 'cal', off: 44, side: 1 });
   }
+  if (L.awakening && proj(0, 0, L.awakening.z - 0.35)) {
+    const a = fog(out.d);
+    if (a > 0.05) labels.push({ pri: 8.5, x: out.x, y: out.y, d: out.d, a, text: `${L.awakening.label} · ${L.awakening.when}`, sub: `此前 ${L.awakening.before} 条 · 此后 ${L.awakening.after} 条`, style: 'cal', off: 44, side: -1 });
+  }
   ctx.globalAlpha = 1;
   ctx.lineWidth = 1;
 }
 
+// 「塔142年」→「塔142年 · 苏醒前10年」
+function wakeTick(label) {
+  const m = L.awakening && /^塔(\d+)/.exec(label);
+  if (!m || Number(m[1]) >= L.awakening.year) return label;
+  return `${label} · 苏醒前${L.awakening.year - Number(m[1])}年`;
+}
+
 function depthAt(z) {
-  return (0 - B.C[0]) * B.f[0] + (0 - B.C[1]) * B.f[1] + (z - B.C[2]) * B.f[2];
+  return (0 - B.C[0]) * B.f[0] + (-z - B.C[1]) * B.f[1] + (0 - B.C[2]) * B.f[2];
 }
 
 function drawPath() {
@@ -813,8 +835,8 @@ function drawActive(k, axis, labels) {
     ctx.moveTo(px[k], py[k]);
     ctx.lineTo(px[j], py[j]);
     ctx.stroke();
-    const s = ps[j] + 2.5;
-    ctx.strokeRect(px[j] - s, py[j] - s, s * 2, s * 2);
+    dot(px[j], py[j], ps[j] + 2.5);
+    ctx.stroke();
   }
   ctx.globalAlpha = 1;
   if (proj(0, 0, p.z)) {
@@ -828,22 +850,23 @@ function drawActive(k, axis, labels) {
     cross(ax, ay, 11);
     labels.push({ pri: 9, x: ax, y: ay, d: out.d, a: 1, text: p.e.when, style: 'when', off: 18, side: -1 });
   }
-  const s = ps[k] + 2;
+  dot(px[k], py[k], ps[k] + 2);
   ctx.fillStyle = pal.lime;
-  ctx.fillRect(px[k] - s, py[k] - s, s * 2, s * 2);
+  ctx.fill();
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = pal.ink;
-  ctx.strokeRect(px[k] - s, py[k] - s, s * 2, s * 2);
+  ctx.stroke();
 }
 
-// 十字方块：轨道上的锚点
+// 十字圆：轴上的锚点
 function cross(x, y, size) {
   const h = size / 2;
+  dot(x, y, h);
   ctx.fillStyle = pal.lime;
-  ctx.fillRect(x - h, y - h, size, size);
+  ctx.fill();
   ctx.lineWidth = 1;
   ctx.strokeStyle = pal.ink;
-  ctx.strokeRect(x - h + 0.5, y - h + 0.5, size - 1, size - 1);
+  ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(x, y - h + 2.5);
   ctx.lineTo(x, y + h - 2.5);
@@ -856,11 +879,12 @@ function drawFocus() {
   if (!proj(0, 0, cam.fz)) return;
   ctx.globalAlpha = 1;
   const x = Math.round(out.x) + 0.5, y = Math.round(out.y) + 0.5;
+  dot(x, y, 6);
   ctx.fillStyle = pal.bg;
-  ctx.fillRect(x - 6, y - 6, 12, 12);
+  ctx.fill();
   ctx.lineWidth = 1;
   ctx.strokeStyle = pal.text;
-  ctx.strokeRect(x - 6, y - 6, 12, 12);
+  ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(x, y - 3.5);
   ctx.lineTo(x, y + 3.5);
@@ -948,7 +972,7 @@ function showTip(k) {
   const shared = reasons(p);
   const touch = matchMedia('(hover: none)').matches;
   tip.innerHTML = `
-    <div class="t3-tip-when">${esc(e.when)}<span>${esc(p.bian)}</span></div>
+    <div class="t3-tip-when">${esc(e.when)}<span>${esc(p.bian)}${p.wake ? ` · ${esc(p.wake)}` : ''}</span></div>
     <div class="t3-tip-gang">${esc(p.gang)}${p.more ? `<span class="muted">（另 ${p.more} 条）</span>` : ''}</div>
     ${(e.benmo ?? []).length ? `<div class="t3-tip-meta">本末：${esc(e.benmo.join('、'))}</div>` : ''}
     ${shared ? `<div class="t3-tip-meta">细线连到相关的 ${p.rel.length} 条：${esc(shared)}</div>` : ''}
@@ -1178,9 +1202,9 @@ function onKey(ev) {
   if (!root || !L || ev.target.matches?.('input, textarea, select') || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   const step = Math.max(1.5, cam.dist * 0.18);
   const keys = {
-    ArrowUp: () => flyTo(cam.fz + step), ArrowDown: () => flyTo(cam.fz - step),
-    PageUp: () => flyTo(cam.fz + step * 4), PageDown: () => flyTo(cam.fz - step * 4),
-    w: () => flyTo(cam.fz + step), s: () => flyTo(cam.fz - step),
+    ArrowUp: () => flyTo(cam.fz - step), ArrowDown: () => flyTo(cam.fz + step),
+    PageUp: () => flyTo(cam.fz - step * 4), PageDown: () => flyTo(cam.fz + step * 4),
+    w: () => flyTo(cam.fz - step), s: () => flyTo(cam.fz + step),
     ArrowLeft: () => flyTo(cam.fz, { yaw: cam.yaw + 0.2 }), ArrowRight: () => flyTo(cam.fz, { yaw: cam.yaw - 0.2 }),
     '+': () => flyTo(cam.fz, { dist: clamp(cam.dist / 1.25, 4, (L.length + 10) * 1.3) }),
     '=': () => flyTo(cam.fz, { dist: clamp(cam.dist / 1.25, 4, (L.length + 10) * 1.3) }),

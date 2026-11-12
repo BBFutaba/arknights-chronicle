@@ -195,7 +195,13 @@ export function collect() {
     }
   } else {
     Object.entries(D.chars).filter(([, c]) => epCount(c) >= opts.minEp).forEach(([n]) => addChar(n));
-    if (opts.powers) for (const id of [...nodes.keys()]) D.chars[id.slice(5)].powers.forEach(addPower);
+    if (opts.powers) {
+      for (const id of [...nodes.keys()]) D.chars[id.slice(5)].powers.forEach(addPower);
+      // 上级也钉上去（清波寨→武陵→文明环带），哪怕板上没有直接属于它的人
+      for (const id of [...nodes.keys()].filter((k) => k.startsWith('power:'))) {
+        for (let p = D.powers[id.slice(6)].parent; p && !nodes.has(`power:${p}`); p = D.powers[p]?.parent) addPower(p);
+      }
+    }
     if (opts.events) {
       D.events.filter((e) => e.chars.filter((n) => nodes.has(`char:${n}`)).length >= 2).forEach((e) => addEvent(e.id));
     }

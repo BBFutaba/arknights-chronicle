@@ -67,6 +67,13 @@ export function update(r) {
   // 全部列表中的人物链接保留混排，其他直达链接按人物键推断所属编。
   if (asked && requested === '全部') bian = '全部';
   side.querySelector('.ch-bian').value = bian;
+  // 地区势力的下拉只列这一编有人的（罗德岛两编都有）
+  const talos = (n) => n.startsWith('终末地·');
+  side.querySelectorAll('.ch-power option[value]:not([value=""])').forEach((o) => {
+    const p = D.powers[o.value];
+    o.hidden = bian !== '全部' && !p.members.some((n) => talos(n) === (bian === BIANS[1]))
+      && (p.game === 'endfield') !== (bian === BIANS[1]);
+  });
   const name = asked || (bian === BIANS[1] ? '终末地·管理员' : '阿米娅');
   renderList(name);
   renderProfile(name);

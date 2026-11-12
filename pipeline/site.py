@@ -172,6 +172,8 @@ class SiteExporter:
                 "mentions": [[gid, eps] for gid, eps in mentions[p.id].items()],
                 "events": self.power_events.get(p.id, []),
             }
+            if getattr(p, "game", "") == "endfield":
+                out[p.id]["game"] = "endfield"
         return out
 
     # ------------------------------------------------------------------ 年表

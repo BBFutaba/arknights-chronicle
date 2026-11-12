@@ -4,6 +4,13 @@ import { esc, href, charChip, powerChip, eventItem, groupLabel } from './util.js
 
 const MEMBER_LIMIT = 80;
 
+// 泰拉编的成员和塔卫二编的分开列（罗德岛两编都有人）
+function memberList(list, title) {
+  if (!list.length) return '';
+  return `<h4>${title}（${list.length}）</h4>
+      <div class="chips">${list.slice(0, MEMBER_LIMIT).map((n) => charChip(n)).join('')}${list.length > MEMBER_LIMIT ? `<span class="muted small">等 ${list.length} 人</span>` : ''}</div>`;
+}
+
 export function powerSections(id) {
   const p = D.powers[id];
   const evs = p.events.map((e) => D.eventById[e]);
@@ -15,8 +22,9 @@ export function powerSections(id) {
       <a class="btn" href="${href.graph('power', id)}">在关系图中查看</a>
     </div>
     ${p.children.length ? `<h4>下属</h4><div class="chips">${p.children.map((k) => powerChip(k)).join('')}</div>` : ''}
-    ${p.members.length ? `<h4>${p.kind === 'region' ? '出身干员' : '成员'}（${p.members.length}）</h4>
-      <div class="chips">${p.members.slice(0, MEMBER_LIMIT).map((n) => charChip(n)).join('')}${p.members.length > MEMBER_LIMIT ? `<span class="muted small">等 ${p.members.length} 人</span>` : ''}</div>` : ''}
+    ${memberList(p.members.filter((n) => !n.startsWith('终末地·')), p.kind === 'region' ? '出身干员' : '成员')}
+    ${memberList(p.members.filter((n) => n.startsWith('终末地·')),
+      `${p.game === 'endfield' ? '' : '塔卫二编的'}${p.kind === 'region' ? '人物' : '成员'}`)}
     <div class="cols">
       <div>${evs.length ? `<h4>相关事件（${evs.length}）</h4>${evs.map(eventItem).join('')}` : '<h4>相关事件</h4><p class="muted">无</p>'}</div>
       <div><h4>提及${p.kind === 'region' ? '此地' : '该势力'}的剧情</h4>

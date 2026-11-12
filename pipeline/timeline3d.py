@@ -14,6 +14,11 @@
   - 没有年份的放在标明的区段里，不参与对数：外纪开头年代不详的远古、泰拉编末尾的「不系年」、
     塔卫二编的「塔罗斯历以前」和「年份不书」（各在书中的位置）。
 
+管理员苏醒：塔卫二编以管理员在帝江号上苏醒为界（书中「管理员苏醒于帝江号」一条，塔罗斯历一五二年春）。
+这一条自成一层，轴上画一圈绿环；塔卫二编每条都标出在苏醒之前还是之后：书中排在它前面的是之前
+（前纪、年份不明的区段、一五二年里苏醒前数周的事），后面的是之后；之前的按书中年份算出「苏醒前 N 年」。
+一五二年是本编推定的「当下」，所以年数随之而定，原文说的「沉睡十年」正对上一四二年的极点远征。
+
 两种历法：书里塔罗斯历不与泰拉历换算，原文也没有给出对应（见 data/annals/丛目/终末地-纪年线索.md）。
 所以塔卫二编画在泰拉编后面，中间断开、不按比例，并在塔罗斯历元年处标明「对应泰拉历：原文未载」。
 将来官方给出对应年份，只改下面的 TALOS_YEAR_ONE_IN_TERRA 一处再跑一次：标注改成「＝泰拉历某年」，
@@ -44,6 +49,10 @@ OUT = ROOT / "site" / "data" / "timeline3d.json"
 # 塔罗斯历元年对应的泰拉历年份。原文未载，书中也不换算，所以是 None。
 # 官方给出对应时填一个数（如 1100），再运行本模块；网页的标注和两编的间距都随之改变。
 TALOS_YEAR_ONE_IN_TERRA: float | None = None
+
+# 管理员苏醒：书中那一条的 id（补条名）和它所在的年份
+AWAKENING_ID = "补:管理员苏醒于帝江号"
+AWAKENING_YEAR = 152
 
 # 纵轴
 PER_LAYER = 4          # 一层最多几条，多了按书中次序分层
@@ -138,7 +147,7 @@ def day_of(label: str | None) -> float:
 
 
 # ---------------------------------------------------------------------------------------------- 读编年史
-def load_entries(annals: dict, region_names: list[str]) -> tuple[list[dict], list[dict]]:
+def load_entries(annals: dict, region_names: list[str], talos_regions: list[str] = ()) -> tuple[list[dict], list[dict]]:
     aliases = annals.get("aliases", {})
     entries, vols = [], []
     for vi, v in enumerate(annals["volumes"]):
@@ -162,7 +171,7 @@ def load_entries(annals: dict, region_names: list[str]) -> tuple[list[dict], lis
                         for k in g.get("kaoyi", []):
                             text.append(k.get("text", "") if isinstance(k, dict) else str(k))
                     gang = "".join(g.get("gang", "") for g in e["groups"])
-                    regions = {r for r in region_names if r in gang}
+                    regions = {r for r in (region_names if bian == TERRA else [*region_names, *talos_regions]) if r in gang}
                     if day and not dated_day:
                         regions.add(day)
                     entries.append({
@@ -211,7 +220,7 @@ def build_keys(entries: list[dict]) -> list[dict]:
     for i, e in enumerate(entries):
         band = band_of(e, deep)
         k = (e["vol"], e["sec"], e["day"]) if not band else (band,)
-        if keys and keys[-1]["k"] == k:
+        if keys and keys[-1]["k"] == k and e["id"] != AWAKENING_ID:  # 苏醒那一条另起一层，前后分得开
             keys[-1]["members"].append(i)
             continue
         single = isinstance(e["year"], int) or bool(re.match(r"^塔\d+$", str(e["year"])))
@@ -495,15 +504,56 @@ def layout(entries: list[dict], top: list[list[tuple[int, float]]]) -> tuple[lis
     return [x * scale for x in xs], [y * scale for y in ys], len(pairs), len(edge_list)
 
 
+# ---------------------------------------------------------------------------------------------- 管理员苏醒
+def talos_year(e: dict) -> int | None:
+    m = re.match(r"^塔(\d+)$", str(e["year"]))
+    if m:
+        return int(m[1])
+    if e["sec_label"].startswith("塔罗斯历"):
+        return label_year(e["sec_label"])
+    return None
+
+
+def awakening_marks(entries: list[dict], keys: list[dict]) -> tuple[list, dict | None]:
+    """塔卫二编每条相对管理员苏醒的位置（泰拉编为 null），和轴上那一圈的位置。"""
+    at = next((i for i, e in enumerate(entries) if e["id"] == AWAKENING_ID), None)
+    if at is None:
+        return [None] * len(entries), None
+    wake, before, after = [], 0, 0
+    for i, e in enumerate(entries):
+        if e["bian"] != TALOS:
+            wake.append(None)
+        elif i == at:
+            wake.append("管理员苏醒")
+        elif i > at:
+            wake.append("苏醒后")
+            after += 1
+        else:
+            before += 1
+            y = talos_year(e)
+            wake.append("苏醒前 · 塔罗斯历以前" if e["sec_label"] == "塔罗斯历以前"
+                        else "苏醒前 · 年数不明" if y is None
+                        else "苏醒前 · 同年" if y >= AWAKENING_YEAR else f"苏醒前 {AWAKENING_YEAR - y} 年")
+    key = next(k for k in keys if at in k["members"])
+    return wake, {
+        "id": AWAKENING_ID, "z": round(key["z0"], 3), "year": AWAKENING_YEAR,
+        "label": "管理员苏醒", "when": "塔罗斯历一五二年春", "before": before, "after": after,
+        "note": f"管理员沉睡十年，醒于帝江号。塔卫二编以此为界：之前 {before} 条，之后 {after} 条；"
+                "之前的按书中年份标出苏醒前几年（一五二年是本编推定的当下）。",
+    }
+
+
 # ---------------------------------------------------------------------------------------------- 入口
 def build(src: Path = SRC, out: Path = OUT, quiet: bool = False) -> dict:
     t0 = time.perf_counter()
     annals = json.loads(src.read_text(encoding="utf-8"))
-    region_names = []
+    region_names, talos_regions = [], []
     if POWERS.exists():
         powers = json.loads(POWERS.read_text(encoding="utf-8"))
-        region_names = sorted({p["name"] for p in powers.values() if p.get("kind") == "region" and len(p["name"]) > 1})
-    entries, vols = load_entries(annals, region_names)
+        regions = [p for p in powers.values() if p.get("kind") == "region" and len(p["name"]) > 1]
+        region_names = sorted({p["name"] for p in regions if p.get("game") != "endfield"})
+        talos_regions = sorted({p["name"] for p in regions if p.get("game") == "endfield"})
+    entries, vols = load_entries(annals, region_names, talos_regions)
     keys = order_keys(build_keys(entries))
     axis = place_z(entries, keys)
     ticks, eras = ticks_for(entries, vols, keys)
@@ -523,6 +573,7 @@ def build(src: Path = SRC, out: Path = OUT, quiet: bool = False) -> dict:
                  + (f"据官方说法，塔罗斯历元年即泰拉历 {terra_year} 年，两编按此排在同一根轴上。" if known else
                     "原文没有说塔罗斯历元年是泰拉历哪一年，书中也不换算，所以两编之间断开，不按比例。")),
     }
+    wake, awakening = awakening_marks(entries, keys)
     data = {
         "version": 1,
         "count": len(entries),
@@ -533,6 +584,7 @@ def build(src: Path = SRC, out: Path = OUT, quiet: bool = False) -> dict:
                     "两层之间隔一格，再按相隔年数取对数加一段。事多的年份拉长，空旷的年代压缩。",
         },
         "calendar": calendar,
+        "awakening": awakening,
         "length": round(axis["length"], 3),
         "breaks": [{"z0": round(a, 3), "z1": round(b, 3), "label": "断开 · 不按比例"} for a, b in axis["breaks"]],
         "bands": [{**b, "z0": round(b["z0"], 3), "z1": round(b["z1"], 3)} for b in axis["bands"]],
@@ -543,6 +595,7 @@ def build(src: Path = SRC, out: Path = OUT, quiet: bool = False) -> dict:
         "x": [round(x, 4) for x in xs],
         "y": [round(y, 4) for y in ys],
         "rel": [[j for j, _ in lst[:REL_SHOWN]] for lst in top],
+        "wake": wake,
     }
     out.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     if not quiet:

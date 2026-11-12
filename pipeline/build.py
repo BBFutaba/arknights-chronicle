@@ -45,6 +45,7 @@ def main():
     built = {gid: [(endfield.analyze_episode if gid.startswith("ef_") else analyze_episode)(e, reg)
                    for e in g.episodes] for gid, g in groups.items()}
     endfield.add_book_aliases(reg)
+    endfield.register_powers(reg)
     events, prts_meta = chronicle.load_events(groups)
 
     if args.structured:
