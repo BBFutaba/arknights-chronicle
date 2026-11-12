@@ -1,6 +1,6 @@
 // 剧情：左侧剧情组目录，右侧是剧情组概览或分集阅读。
 import { D, loadStory } from './data.js';
-import { esc, href, epLabel, groupLabel, charChip, charOf, powerChip, eventItem, threadColor, pageHead } from './util.js';
+import { esc, href, epLabel, groupLabel, charLabel, charChip, charOf, powerChip, eventItem, threadColor, pageHead } from './util.js';
 
 const CAT_EN = { 主线: 'MAIN STORY', 活动: 'EVENT', 故事集: 'COLLECTION', 干员密录: 'OPERATOR RECORD', 集成战略: 'INTEGRATED STRATEGIES', 生息演算: 'RECLAMATION ALGORITHM', 其他文本: 'OTHER TEXT' };
 
@@ -136,7 +136,7 @@ function renderLine([k, sp, t]) {
   if (k === 'd') {
     const c = charOf(sp);
     const cls = c ? c.kind : 'plain';
-    const name = sp ? (c ? `<a href="${href.char(sp)}">${esc(sp)}</a>` : esc(sp)) : '（画外音）';
+    const name = sp ? (c ? `<a href="${href.char(sp)}">${charLabel(sp)}</a>` : charLabel(sp)) : '（画外音）';
     return `<div class="ln d"><span class="sp ${cls}" title="${esc(sp)}">${name}</span><span>${esc(t)}</span></div>`;
   }
   if (k === 'n') return `<div class="ln n">${esc(t)}</div>`;

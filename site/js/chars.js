@@ -1,6 +1,6 @@
 // 人物：左侧可筛选的人物列表，右侧人物卡片（档案、出场、相关事件、常同场人物）。
 import { D } from './data.js';
-import { esc, href, KIND_LABEL, charChip, powerChip, eventItem, groupLabel, pageHead } from './util.js';
+import { esc, href, KIND_LABEL, charName, charLabel, charMark, charChip, powerChip, eventItem, groupLabel, pageHead } from './util.js';
 
 const KIND_EN = { operator: 'OPERATOR', npc: 'NPC', doctor: 'DOCTOR' };
 
@@ -71,7 +71,7 @@ function renderList(activeName) {
   const metric = (c) => sort === 'lines' ? `${c.lines} 句` : sort === 'events' ? `${c.events.length} 事件` : `${epCount(c)} 集`;
   side.querySelector('.list').innerHTML = shown.map(([n, c]) => `
     <a class="list-item${n === activeName ? ' active' : ''}" data-name="${esc(n)}" href="${href.char(n)}">
-      <span class="n" style="color:var(--c-${c.kind})">●</span><span class="grow">${esc(n)}</span>
+      <span class="n" style="color:var(--c-${c.kind})">●</span><span class="grow">${charLabel(n)}</span>
       <span class="n">${metric(c)}</span></a>`).join('')
     + (arr.length > LIST_LIMIT ? `<div class="muted small pad">共 ${arr.length} 人，只显示前 ${LIST_LIMIT} 个，请用搜索缩小范围。</div>` : '');
 }
@@ -86,9 +86,9 @@ function renderProfile(name) {
   const written = D.annalsByPerson[name]?.length ?? 0;
   content.innerHTML = `${pageHead({
     en: c.appellation || KIND_EN[c.kind],
-    title: name,
+    title: charName(name),
     sub: c.aliases.length ? `又名：${c.aliases.map(esc).join('、')}` : '',
-    tags: `<span class="chip chip-${c.kind}">${KIND_LABEL[c.kind]}</span>
+    tags: `${charMark(name)}<span class="chip chip-${c.kind}">${KIND_LABEL[c.kind]}</span>
       ${c.profession ? `<span class="chip chip-plain">${esc(c.profession)} ${stars}</span>` : ''}`,
     nums: [
       ['出场', epCount(c), '集', 'EPISODES'], ['台词', c.lines, '句', 'LINES'],
@@ -99,7 +99,7 @@ function renderProfile(name) {
     <div class="actions">
       ${evs.length ? `<a class="btn" href="${href.timeline({ char: name })}">在时间轴中查看（${evs.length} 条事件）</a>` : ''}
       <a class="btn" href="${href.graph('char', name)}">在关系图中查看</a>
-      ${D.zhuanByName[name]?.entries.length ? `<a class="btn" href="${href.zhuan(name)}">${esc(name)}传</a>` : ''}
+      ${D.zhuanByName[name]?.entries.length ? `<a class="btn" href="${href.zhuan(name)}">${charLabel(name)}传</a>` : ''}
     </div>
     ${c.powers.length ? `<h4>所属</h4><div class="chips">${c.powers.map((p) => powerChip(p)).join('')}</div>` : ''}
     ${c.description ? `<h4>敌人图鉴</h4><p>${esc(c.description)}</p>` : ''}

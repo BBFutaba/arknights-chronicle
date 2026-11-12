@@ -1,13 +1,13 @@
 // 顶栏全局搜索：人物、博物志（含全部地区势力）、剧情组、分集、事件。
 import { D } from './data.js';
-import { esc, href, epLabel, groupLabel, KIND_LABEL } from './util.js';
+import { esc, href, charName, charMark, epLabel, groupLabel, KIND_LABEL } from './util.js';
 
 let index = [];
 
 function buildIndex() {
   index = [];
   for (const [name, c] of Object.entries(D.chars)) {
-    index.push({ cat: '人物', keys: [name, ...c.aliases, c.appellation].filter(Boolean), label: name,
+    index.push({ cat: '人物', keys: [name, charName(name), ...c.aliases, c.appellation].filter(Boolean), label: charName(name), mark: charMark(name),
       sub: KIND_LABEL[c.kind] + (c.appear.length ? ` · 出场 ${c.appear.reduce((n, a) => n + a[1].length, 0)} 集` : ''),
       url: href.char(name), weight: c.appear.length + c.events.length });
   }
@@ -68,7 +68,7 @@ export function initSearch() {
     results.innerHTML = items.map((it, i) => {
       const head = it.cat !== cat ? `<div class="sr-cat">${(cat = it.cat)}</div>` : '';
       return `${head}<a class="sr-item${i === active ? ' active' : ''}" href="${it.url}" data-i="${i}">
-        <span class="sr-label">${esc(it.label)}</span><span class="sr-sub">${esc(it.sub)}</span></a>`;
+        <span class="sr-label">${esc(it.label)}${it.mark ?? ''}</span><span class="sr-sub">${esc(it.sub)}</span></a>`;
     }).join('');
   };
   const close = () => { results.hidden = true; input.blur(); };

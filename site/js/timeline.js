@@ -2,8 +2,8 @@
 // 最左边的灰线是「主世界线」，只有设定资料出处的事件画在上面；每个剧情组是一条故事线，
 // 从主世界线分出、结束时合回。同一时期有几条故事线并行，就分出几条。
 // 一条故事线的两个事件之间隔得太远（超过 GAP 行）时会先合回再重新分出，避免一条线占满整列。
-import { D } from './data.js';
-import { esc, href, threadColor, threadChip, charChip, powerChip, epLabel, groupLabel, CAT_ORDER, pageHead } from './util.js';
+import { D, BIANS } from './data.js';
+import { esc, href, charLabel, charName, threadColor, threadChip, charChip, powerChip, epLabel, groupLabel, CAT_ORDER, pageHead } from './util.js';
 
 const ROW = 34;
 const GAP = 16;
@@ -17,15 +17,16 @@ let rowOf = {};      // 事件 id → 行号
 let visible = [];    // 当前筛选后的事件，用于上一条/下一条
 let selected = null;
 let lastFilterKey = null;
-const state = { q: '', cats: new Set(CAT_ORDER), parallel: true, cunmu: false, char: null, power: null, thread: null };
+const state = { bian: BIANS[0], q: '', cats: new Set(CAT_ORDER), parallel: true, cunmu: false, char: null, power: null, thread: null };
 
 export function mount(el, r) {
   root = el;
   el.innerHTML = `
     <aside class="tl-side panel">
+      <label>编 <select class="tl-bian">${BIANS.map((b) => `<option>${esc(b)}</option>`).join('')}</select></label>
       <input class="tl-q" type="search" placeholder="筛选事件文字…">
       <div class="tl-toggles">
-        ${CAT_ORDER.map((c) => `<label class="toggle"><input type="checkbox" value="${c}" ${state.cats.has(c) ? 'checked' : ''}>${c}</label>`).join('')}
+        <div class="tl-categories"></div>
         <label class="toggle"><input type="checkbox" class="tl-par" ${state.parallel ? 'checked' : ''}>平行世界</label>
         <label class="toggle"><input type="checkbox" class="tl-cun" ${state.cunmu ? 'checked' : ''}>PRTS 存目</label>
       </div>
@@ -46,10 +47,16 @@ export function mount(el, r) {
   const q = el.querySelector('.tl-q');
   q.value = state.q;
   q.addEventListener('input', () => { state.q = q.value; render(); });
-  el.querySelectorAll('.tl-toggles input[value]').forEach((cb) => cb.addEventListener('change', () => {
+  el.querySelector('.tl-bian').addEventListener('change', (e) => {
+    state.q = '';
+    q.value = '';
+    location.hash = href.timeline({ bian: e.target.value });
+  });
+  el.querySelector('.tl-categories').addEventListener('change', (e) => {
+    const cb = e.target;
     cb.checked ? state.cats.add(cb.value) : state.cats.delete(cb.value);
     render();
-  }));
+  });
   el.querySelector('.tl-par').addEventListener('change', (e) => { state.parallel = e.target.checked; render(); });
   el.querySelector('.tl-cun').addEventListener('change', (e) => { state.cunmu = e.target.checked; render(); });
   canvas.addEventListener('click', (e) => {
@@ -74,7 +81,17 @@ export function update(r) {
   state.char = p.get('char');
   state.power = p.get('power');
   state.thread = p.get('thread');
-  const key = JSON.stringify([state.char, state.power, state.thread]);
+  const inferred = D.eventById[p.get('ev')]?.bian
+    ?? (state.char?.startsWith('终末地·') || state.thread?.startsWith('ef_') ? BIANS[1] : BIANS[0]);
+  const bian = BIANS.includes(p.get('bian')) ? p.get('bian') : inferred;
+  const categories = bian === BIANS[0] ? CAT_ORDER
+    : [...new Set(['设定', ...Object.entries(D.threads).filter(([id]) => id.startsWith('ef_')).map(([, t]) => t.category)])];
+  if (bian !== state.bian || lastFilterKey === null) state.cats = new Set(categories);
+  state.bian = bian;
+  root.querySelector('.tl-bian').value = bian;
+  root.querySelector('.tl-categories').innerHTML = categories.map((c) =>
+    `<label class="toggle"><input type="checkbox" value="${esc(c)}" ${state.cats.has(c) ? 'checked' : ''}>${esc(c.replace(/^终末地·/, ''))}</label>`).join('');
+  const key = JSON.stringify([state.bian, state.char, state.power, state.thread]);
   if (key !== lastFilterKey) {
     lastFilterKey = key;
     render();
@@ -84,6 +101,7 @@ export function update(r) {
 
 // ------------------------------------------------------------------ 筛选与布局
 function matches(e) {
+  if ((e.bian ?? BIANS[0]) !== state.bian) return false;
   const cat = D.threads[e.thread]?.category ?? '设定';
   if (!state.cats.has(cat)) return false;
   if (!state.parallel && e.parallel) return false;
@@ -209,16 +227,17 @@ function placeMarks() {
 function renderSide(lanes) {
   const active = [];
   const without = (k) => {
-    const p = new URLSearchParams({ char: state.char ?? '', power: state.power ?? '', thread: state.thread ?? '' });
+    const p = new URLSearchParams({ bian: state.bian, char: state.char ?? '', power: state.power ?? '', thread: state.thread ?? '' });
     p.delete(k);
     for (const [kk, v] of [...p]) if (!v) p.delete(kk);
     return `#/timeline${p.size ? `?${p}` : ''}`;
   };
-  if (state.char) active.push(`<a class="filter-chip" href="${without('char')}">人物：${esc(state.char)} ×</a>`);
+  if (state.char) active.push(`<a class="filter-chip" href="${without('char')}">人物：${charLabel(state.char)} ×</a>`);
   if (state.power) active.push(`<a class="filter-chip" href="${without('power')}">地区/势力：${esc(D.powers[state.power]?.name ?? state.power)} ×</a>`);
   if (state.thread) active.push(`<a class="filter-chip" href="${without('thread')}">故事线：${esc(D.threads[state.thread]?.name ?? state.thread)} ×</a>`);
   root.querySelector('.tl-active').innerHTML = active.join('');
-  root.querySelector('.tl-count').textContent = `显示 ${visible.length} / ${D.events.length} 条事件，最多 ${lanes - 1} 条故事线并行`;
+  const total = D.events.filter((e) => (e.bian ?? BIANS[0]) === state.bian).length;
+  root.querySelector('.tl-count').textContent = `显示 ${visible.length} / ${total} 条事件，最多 ${lanes - 1} 条故事线并行`;
 
   const eras = [];
   items.forEach((it, r) => {
@@ -230,15 +249,16 @@ function renderSide(lanes) {
   root.querySelector('.tl-eras').innerHTML = eras.map((e) =>
     `<button data-row="${Math.max(e.row, 0)}">${esc(e.name)}<span class="muted">${e.n}</span></button>`).join('');
 
-  const title = state.char ? `人物：${state.char}`
+  const title = state.char ? `人物：${charName(state.char)}`
     : state.power ? `地区与势力：${D.powers[state.power]?.name ?? state.power}`
       : state.thread ? `故事线：${D.threads[state.thread]?.name ?? state.thread}` : '全部事件';
   root.querySelector('.tl-head').innerHTML = pageHead({
     en: state.char || state.power || state.thread ? 'FILTERED' : 'ALL EVENTS',
     title,
+    sub: esc(state.bian),
     rail: false,
     nums: [
-      ['显示', visible.length, '条', 'SHOWN'], ['全部', D.events.length, '条', 'TOTAL'],
+      ['显示', visible.length, '条', 'SHOWN'], ['全部', total, '条', 'TOTAL'],
       ['并行', Math.max(lanes - 1, 0), '线', 'THREADS'], ['时代', eras.length, '段', 'ERAS'],
     ],
   });
@@ -249,11 +269,13 @@ function choose(id, scroll) {
   select(id, scroll);
   const p = new URLSearchParams(location.hash.split('?')[1] ?? '');
   p.set('ev', id);
+  p.set('bian', state.bian);
   history.replaceState(null, '', `#/timeline?${p}`);
 }
 
 function select(id, scroll) {
-  const ev = id && D.eventById[id];
+  const candidate = id && D.eventById[id];
+  const ev = candidate && (candidate.bian ?? BIANS[0]) === state.bian ? candidate : null;
   canvas.querySelectorAll('.sel').forEach((n) => n.classList.remove('sel'));
   if (!ev) {
     selected = null;

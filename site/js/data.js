@@ -6,6 +6,8 @@ export const D = {
   bowu: null,
 };
 
+export const BIANS = ['泰拉编', '塔卫二编'];
+
 async function json(path) {
   const r = await fetch(path);
   if (!r.ok) throw new Error(`加载 ${path} 失败：${r.status}`);
@@ -28,6 +30,7 @@ export async function loadAll() {
   D.annals = await json('data/annals.json').catch(() => null);
   for (const v of D.annals?.volumes ?? []) {
     for (const s of v.sections) for (const d of s.days) for (const e of d.entries) {
+      e.bian ??= v.bian ?? BIANS[0];
       D.annalsEntry[e.id] = e;
       e.ids.forEach((i) => { D.annalsByEvent[i] = e.id; });
       const people = new Set(e.groups.flatMap((g) => g.people.flatMap((t) => [...t.matchAll(/\[\[([^\]|]+)/g)].map((m) => m[1]))));
@@ -38,8 +41,14 @@ export async function loadAll() {
   D.charAlias = {};
   for (const [name, c] of Object.entries(D.chars)) for (const a of c.aliases) D.charAlias[a] ??= name;
   for (const [a, name] of Object.entries(D.annals?.aliases ?? {})) if (D.chars[name]) D.charAlias[a] ??= name;
-  for (const b of D.annals?.benmo ?? []) D.benmoByTitle[b.title] = b;
-  for (const z of D.annals?.liezhuan ?? []) D.zhuanByName[z.name] = z;
+  for (const b of D.annals?.benmo ?? []) {
+    D.benmoByTitle[`${b.bian ?? BIANS[0]}:${b.title}`] = b;
+    D.benmoByTitle[b.title] ??= b;
+  }
+  for (const z of D.annals?.liezhuan ?? []) {
+    D.zhuanByName[`${z.bian ?? BIANS[0]}:${z.name}`] = z;
+    D.zhuanByName[z.name] ??= z;
+  }
   // 博物志也是可选的：还没有 bowu.json 时只列地区势力
   D.bowu = await json('data/bowu.json').catch(() => (
     { men: ['地理', '势力', '族裔', '源石', '科技', '人文', '生灵', '远古'], entries: [], powers: {} }));
@@ -58,17 +67,17 @@ const uniq = (list) => [...new Set(list)];
 // 编年史的一个条目是时间轴的一行：次序、日期、文字都用书里的，PRTS 年表只作参考（row.prts）。
 // 分段：单年的卷按年，合卷按书里的小节。
 function timelineRow(v, s, d, e, own) {
-  const single = typeof v.year === 'number';
+  const single = typeof v.year === 'number' || /^塔\d+$/.test(v.year);
   const day = d.label && d.label !== '是月' ? d.label : '';
   const quotes = e.groups.flatMap((g) => g.quotes ?? []);
   const stories = uniq(quotes.filter((q) => q.type === 'story').map((q) => q.sid)).filter((sid) => D.epById[sid]);
   const line = [...stories.map((sid) => D.epById[sid].group.id), ...(e.threads ?? []), ...own.map((p) => p.thread)]
-    .find((id) => STORY_LINE.has(D.threads[id]?.category));
+    .find((id) => STORY_LINE.has(D.threads[id]?.category) || id?.startsWith('ef_'));
   const lines = e.groups.map((g) => g.gang.replace(/\*\*/g, ''));
   const text = lines.join('');
   const names = e.groups.flatMap((g) => g.people.flatMap((t) => [...t.matchAll(/\[\[([^\]|]+)/g)].map((m) => m[1])));
   return {
-    id: e.id, era: v.title.replace(/^泰拉历/, ''), year: single ? v.year : null,
+    id: e.id, bian: v.bian ?? BIANS[0], era: v.title.replace(/^泰拉历/, ''), year: single ? v.year : null,
     head: single ? v.title.replace(/^泰拉历/, '') : s.label,
     short: !single ? day : s.label === '是岁' ? `是岁 ${day}`.trim() : `${s.label}${day}`,
     when: e.when, lines, prts: own, moved: Boolean(e.moved),
@@ -91,7 +100,7 @@ function timelineRow(v, s, d, e, own) {
 // 存目：书里判定于人于事没有推力、不入正文的年表事件。默认不显示，可以在时间轴打开。
 function cunmuRow(c, p, anchor) {
   return {
-    id: p.id, era: anchor.era, year: anchor.year, head: anchor.head, short: '存目', when: p.when,
+    id: p.id, bian: anchor.bian, era: anchor.era, year: anchor.year, head: anchor.head, short: '存目', when: p.when,
     lines: [c.gang.replace(/\*\*/g, '')], prts: [p], cunmu: true, moved: false, parallel: p.parallel,
     notes: ['存目：于人于事没有推力，不入编年史正文。', ...(c.kaoyi ?? []).map((k) => k.text)],
     thread: p.thread, sources: p.sources, chars: p.chars, powers: p.powers,

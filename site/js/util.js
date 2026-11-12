@@ -12,13 +12,15 @@ export const href = {
   wu: (name) => (name ? `#/bowu/${enc(name)}` : '#/bowu'),
   group: (gid) => `#/story/${enc(gid)}`,
   ep: (sid) => `#/story/${enc(D.epById[sid]?.group.id ?? '')}/${enc(sid)}`,
-  event: (id) => `#/timeline?ev=${enc(id)}`,
-  timeline: (params) => `#/timeline?${new URLSearchParams(params)}`,
+  event: (id) => `#/timeline?${new URLSearchParams({ ev: id, ...(D.eventById[id]?.bian === '塔卫二编' ? { bian: '塔卫二编' } : {}) })}`,
+  timeline: (params) => `#/timeline?${new URLSearchParams({
+    ...(params.char?.startsWith('终末地·') || params.thread?.startsWith('ef_') ? { bian: '塔卫二编' } : {}), ...params,
+  })}`,
   graph: (type, id) => `#/graph/${type}:${enc(id)}`,
   annals: (year, entry) => `#/annals/${year}${entry ? `?e=${entry}` : ''}`,
   annalsEntry: (id) => `#/annals/${D.annalsEntry[id]?.year ?? ''}?e=${id}`,
-  benmo: (title) => `#/benmo/${enc(title)}`,
-  zhuan: (name) => `#/zhuan/${enc(name)}`,
+  benmo: (title, bian) => `#/benmo/${enc(title)}${bian === '塔卫二编' ? '?bian=' + enc(bian) : ''}`,
+  zhuan: (name, bian) => `#/zhuan/${enc(name)}${(bian ?? D.zhuanByName[name]?.bian) === '塔卫二编' ? '?bian=' + enc('塔卫二编') : ''}`,
 };
 
 export const KIND_LABEL = { operator: '干员', npc: 'NPC', doctor: '博士' };
@@ -47,11 +49,15 @@ export function charOf(name) {
   return D.chars[name] ?? D.chars[D.charAlias?.[name]];
 }
 
+export const charName = (name) => String(name).replace(/^终末地·/, '');
+export const charMark = (name) => (String(name).startsWith('终末地·') ? '<small class="game-mark">终末地</small>' : '');
+export const charLabel = (name) => `${esc(charName(name))}${charMark(name)}`;
+
 export function charChip(name, extra = '') {
   const c = charOf(name);
   const cls = c ? `chip chip-${c.kind}` : 'chip chip-plain';
-  return c ? `<a class="${cls}" href="${href.char(name)}">${esc(name)}${extra}</a>`
-    : `<span class="${cls}">${esc(name)}${extra}</span>`;
+  return c ? `<a class="${cls}" href="${href.char(name)}">${charLabel(name)}${extra}</a>`
+    : `<span class="${cls}">${charLabel(name)}${extra}</span>`;
 }
 
 export function powerChip(id, extra = '') {

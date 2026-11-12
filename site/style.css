@@ -776,3 +776,7 @@ main.view-graph .st-track { margin-top: auto; }
   .capbar { padding: 0 12px; }
   .cap-wide { display: none; }
 }
+
+.game-mark { display: inline-block; margin-left: .4em; padding: 0 .3em; border: 1px solid currentColor; border-radius: 2px; font-size: 10px; line-height: 1.4; font-weight: normal; opacity: .7; vertical-align: middle; white-space: nowrap; }
+.tl-bian, .shelf-bian { margin: 8px 0 12px; max-width: 100%; }
+.tl-categories { display: contents; }

@@ -1,6 +1,6 @@
 // 列传：按人。索引写在 data/annals/列传索引*.md，首见和条数由程序算。
 import { D } from './data.js';
-import { esc, href, KIND_LABEL, pageHead } from './util.js';
+import { esc, href, charName, charMark, KIND_LABEL, pageHead } from './util.js';
 import { inline, entryHtml, controlsHtml, wireControls, jumpToEntry } from './annals.js';
 import { makeShelf, OPTION_NONE, plainFirst, cnYearNumber, volumeOrder } from './shelf.js';
 
@@ -8,6 +8,7 @@ const FATE = { 已: '盖棺定论', 未: '来日方长', 未卜: '生死未卜',
 const ERAS = ['前纪与外纪', '一〇八〇至一〇九五年', '一〇九六至一〇九九年', '一一〇〇至一一〇三年', '不系年'];
 
 function eraOf(year) {
+  if (String(year).startsWith('塔')) return D.annals.volumes.find((v) => v.year === year)?.title ?? year;
   if (year === '不系年') return '不系年';
   if (typeof year !== 'number') return ERAS[0];
   return year < 1096 ? ERAS[1] : year < 1100 ? ERAS[2] : ERAS[3];
@@ -31,9 +32,9 @@ function items() {
     const first = z.entries[0]?.year;
     const origin = ix.place ? `${ix.origin} · ${ix.place}` : ix.origin;
     const item = {
-      key: z.name, z, ix, name: `${z.name}传`, url: href.zhuan(z.name), n: z.entries.length,
+      key: z.name, bian: z.bian, z, ix, name: `${charName(z.name)}传`, url: href.zhuan(z.name, z.bian), n: z.entries.length,
       line: plainFirst(z.summary),
-      tags: [origin, ix.race, ...ix.factions, ix.fate ? fateTag(ix) : '', `${z.entries.length} 条`].filter(Boolean),
+      tags: [z.bian === '塔卫二编' ? '终末地' : '', origin, ix.race, ...ix.factions, ix.fate ? fateTag(ix) : '', `${z.entries.length} 条`].filter(Boolean),
       text: [z.name, ...(c?.aliases ?? []), ...(aliasesOf[z.name] ?? []), ...z.summary, origin, ix.race, ...ix.factions, ix.note].join(' ').toLowerCase(),
       facets: {
         出身: [ix.origin], 身后: ix.fate ? [ix.fate] : [], 族裔: ix.race ? [ix.race] : [], 所属: ix.factions,
@@ -45,7 +46,7 @@ function items() {
         卒年: cnYearNumber(ix.died),
       },
     };
-    byName[z.name] = item;
+    byName[`${z.bian ?? '泰拉编'}:${z.name}`] = item;
     return item;
   });
 }
@@ -58,9 +59,9 @@ function detail(item, el, links) {
   const seeEntry = ix.ev && D.annalsEntry[ix.ev] ? ` <a href="${href.annalsEntry(ix.ev)}">见此条</a>` : '';
   el.innerHTML = `${pageHead({
     en: 'BIOGRAPHY',
-    title: `${z.name}传`,
+    title: `${charName(z.name)}传`,
     back: [links.back, '← 列传索引'],
-    sub: `${z.span ? `${esc(z.span[0])}${z.span[1] !== z.span[0] ? ` 至 ${esc(z.span[1])}` : ''} · ` : ''}<a href="${href.char(z.name)}">人物页</a>`,
+    sub: `${esc(z.bian ?? '泰拉编')} ${charMark(z.name)} · ${z.span ? `${esc(z.span[0])}${z.span[1] !== z.span[0] ? ` 至 ${esc(z.span[1])}` : ''} · ` : ''}<a href="${href.char(z.name)}">人物页</a>`,
     tags: [
       chip('出身', ix.origin, ix.place ? `${ix.origin} · ${ix.place}` : ix.origin),
       ix.race ? chip('族裔', ix.race) : '',
@@ -95,7 +96,7 @@ const shelf = makeShelf({
   groups: ['出身', '身后', '族裔', '所属', '首见', '身份', OPTION_NONE],
   sorts: ['条数', '拼音', '首见', '卒年'],
   items,
-  resolve: (key) => byName[D.zhuanByName[key]?.name],
+  resolve: (key, bian) => byName[`${bian}:${D.zhuanByName[`${bian}:${key}`]?.name ?? D.zhuanByName[key]?.name ?? key}`],
   detail,
   jump: jumpToEntry,
 });

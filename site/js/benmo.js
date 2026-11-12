@@ -11,13 +11,16 @@ const PERIODS = [EARLY, ...[1097, 1098, 1099, 1100, 1101, 1102, 1103].map(cnYear
 // 一件事可能追溯很远，时期看条目最多的那一年；一样多时取晚的，早的多是前因
 function mainYear(b) {
   const counts = new Map();
-  for (const { year } of b.entries) if (typeof year === 'number') counts.set(year, (counts.get(year) ?? 0) + 1);
+  for (const { year } of b.entries) if (typeof year === 'number' || /^塔\d+$/.test(year)) counts.set(year, (counts.get(year) ?? 0) + 1);
+  const number = (year) => typeof year === 'number' ? year : Number(year.slice(1));
   let best = null;
-  for (const [year, n] of counts) if (best === null || n > counts.get(best) || (n === counts.get(best) && year > best)) best = year;
+  for (const [year, n] of counts) if (best === null || n > counts.get(best) || (n === counts.get(best) && number(year) > number(best))) best = year;
   return best;
 }
 
-const periodOf = (year) => (year === null || year < 1097 ? EARLY : cnYear(year));
+const periodOf = (year, bian) => (bian === '塔卫二编'
+  ? D.annals.volumes.find((v) => v.year === (year ?? '塔卫二前纪'))?.title ?? year ?? '塔卫二前纪'
+  : year === null || year < 1097 ? EARLY : cnYear(year));
 
 function topPeople(entries) {
   const counts = new Map();
@@ -40,14 +43,14 @@ function items() {
     const year = mainYear(b);
     const span = `${b.span[0]}${b.span[1] !== b.span[0] ? ` 至 ${b.span[1]}` : ''}`;
     const item = {
-      key: b.title, b, ix, entries, people, name: b.title, url: href.benmo(b.title), n: b.entries.length,
+      key: b.title, bian: b.bian, b, ix, entries, people, name: b.title, url: href.benmo(b.title, b.bian), n: b.entries.length,
       line: ix.note,
       tags: [...ix.regions, ix.kind, ix.end, span, `${b.entries.length} 条`].filter(Boolean),
       text: [b.title, ...b.summary, ...ix.regions, ix.kind, ix.note, ...people].join(' ').toLowerCase(),
-      facets: { 时期: [periodOf(year)], 地区: ix.regions, 性质: ix.kind ? [ix.kind] : [], 了局: ix.end ? [ix.end] : [] },
+      facets: { 时期: [periodOf(year, b.bian)], 地区: ix.regions, 性质: ix.kind ? [ix.kind] : [], 了局: ix.end ? [ix.end] : [] },
       sort: { 时间: year === null ? order[b.entries[0]?.year] ?? 0 : order[year], 条数: -b.entries.length, 拼音: b.title },
     };
-    byTitle[b.title] = item;
+    byTitle[`${b.bian ?? '泰拉编'}:${b.title}`] = item;
     return item;
   });
 }
@@ -59,7 +62,7 @@ function detail(item, el, links) {
     en: 'TOPIC, START TO END',
     title: b.title,
     back: [links.back, '← 纪事本末索引'],
-    sub: `${esc(b.span[0])}${b.span[1] !== b.span[0] ? ` 至 ${esc(b.span[1])}` : ''}`,
+    sub: `${esc(b.bian ?? '泰拉编')} · ${esc(b.span[0])}${b.span[1] !== b.span[0] ? ` 至 ${esc(b.span[1])}` : ''}`,
     tags: [...ix.regions.map((r) => chip('地区', r)), ix.kind ? chip('性质', ix.kind) : '', ix.end ? chip('了局', ix.end) : ''].join(''),
     note: ix.note ? esc(ix.note) : '',
     nums: [['条目', entries.length, '条', 'ENTRIES'], people.length ? ['人物', people.length, '人', 'PEOPLE'] : null],
@@ -68,7 +71,7 @@ function detail(item, el, links) {
     ${people.length ? `<details class="an-index"><summary>主要人物（${people.length} 人）</summary><div class="chips">${people.map((n) => charChip(n)).join('')}</div></details>` : ''}
     <details class="an-index"><summary>按时间列出各条纲（${entries.reduce((n, e) => n + e.groups.length, 0)} 组）</summary>
       <ol>${entries.map((e) => e.groups.map((g) => `
-        <li><a href="${href.benmo(b.title)}?e=${e.id}"><span class="when">${esc(e.when)}</span>${inline(g.gang)}</a></li>`).join('')).join('')}</ol>
+        <li><a href="${href.benmo(b.title, b.bian)}${b.bian === '塔卫二编' ? '&' : '?'}e=${encodeURIComponent(e.id)}"><span class="when">${esc(e.when)}</span>${inline(g.gang)}</a></li>`).join('')).join('')}</ol>
     </details>
     ${controlsHtml()}
     ${entries.map((e) => entryHtml(e, true)).join('')}
@@ -89,7 +92,7 @@ const shelf = makeShelf({
   groups: ['时期', '地区', '性质', '了局', OPTION_NONE],
   sorts: ['时间', '条数', '拼音'],
   items,
-  resolve: (key) => byTitle[key],
+  resolve: (key, bian) => byTitle[`${bian}:${key}`],
   detail,
   jump: jumpToEntry,
 });

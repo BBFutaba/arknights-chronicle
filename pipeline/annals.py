@@ -25,6 +25,13 @@
 博物志在 data/annals/博物志/*.md，每条以一行 @物 开头，格式见 data/annals/博物志须知.md。build 导出
 site/data/bowu.json（网页「博物志」页用），只含编者文字和条目里写的短引。
 
+塔卫二编独立使用塔罗斯历，不与泰拉历换算：塔152/ 一年一卷，塔卫二前纪/ 收元年前及一五二年前的事。
+条目写 @条 补:名称 系:塔152[-春|-03|-03-14|-02~04]；仅知年份配 是岁:地区。
+前纪另可写 系:塔前（塔罗斯历以前）、系:塔不书（年份不书），不必写 次:ev编号。
+前纪按年、月季、文件名、文件内先后排列。[[佩丽卡]]、传:佩丽卡、@传 佩丽卡 优先用终末地人物；
+明确指向泰拉写 [[泰拉·赫拉格]]。列传、列传索引、纪事本末、本末索引各用同名加 -塔卫二.md 的文件。
+塔卫二本末只靠条目的 事: 收录，不用 @线/@加/@减。annals.json 的卷、条目、列传、本末均带 bian。
+
     python -m pipeline.annals show <分集id> [起 止]   带行号列出剧本
     python -m pipeline.annals find <正则> [组id]      在剧本里搜索
     python -m pipeline.annals check <稿件路径>        检查一个稿件文件（卷稿和博物志都用它）
@@ -72,6 +79,41 @@ def aliases() -> dict[str, str]:
 
 def canon(name: str) -> str:
     return aliases().get(name, name)
+
+
+TERRA = "泰拉编"
+TALOS = "塔卫二编"
+TALOS_PRE = "塔卫二前纪"
+TALOS_PRESENT = 152
+
+
+def volume_bian(vol) -> str:
+    return TALOS if vol == TALOS_PRE or re.fullmatch(r"塔\d+", str(vol)) else TERRA
+
+
+def person_name(name: str, bian: str, probs: Problems, where: str) -> str:
+    if bian == TERRA:
+        return canon(name)
+    if name.startswith("泰拉·"):
+        target = canon(name.removeprefix("泰拉·"))
+    elif name.startswith("终末地·"):
+        target = name
+    elif "终末地·" + name in characters():
+        target = "终末地·" + name
+    else:
+        target = canon(name)
+        if target in characters():
+            probs.notes.append(f"{where}：终末地没有「{name}」，链接到泰拉人物「{target}」；可写 泰拉·{name} 明示")
+    if target not in characters():
+        probs.add(where, f"人物页里没有「{name}」")
+    return target
+
+
+def person_links(text: str, bian: str, probs: Problems, where: str) -> str:
+    if bian == TERRA:
+        return text
+    return re.sub(r"\[\[([^\]|]+)(\|[^\]]*)?\]\]",
+                  lambda m: "[[" + person_name(m[1], bian, probs, where) + (m[2] or "") + "]]", text)
 
 
 @cache
@@ -150,6 +192,8 @@ MERGED = {
 
 
 def year_events(year) -> list[str]:
+    if volume_bian(year) == TALOS:
+        return []
     if year in MERGED:
         return [i for i, e in events().items() if MERGED[year][1](e)]
     return [i for i, e in events().items() if eff_year(e) == year or (year == 1103 and "时间未知" in e["era"])]
@@ -175,6 +219,10 @@ def episode_label(story_id: str) -> str:
 
 
 class Problems(list):
+    def __init__(self):
+        super().__init__()
+        self.notes: list[str] = []
+
     def add(self, where: str, msg: str):
         self.append(f"{where}：{msg}")
 
@@ -293,6 +341,8 @@ def cn_big(n: int) -> str:
 def era_label(when: str, y: int | None, vol: str) -> str:
     """合卷里的年份大标题。"""
     w = when.strip()
+    if vol == TALOS_PRE:
+        return ("年份不书" if y is None else "塔罗斯历以前" if y == 0 else f"塔罗斯历{cn_year(y)}年")
     if m := re.match(r"^(约?)前\s*(\d+)\s*年(?:\s*[~～\-]\s*前\s*(\d+)\s*年)?", w):
         tail = f"至前{cn_big(int(m[3]))}年" if m[3] else "年"
         return f"{m[1]}前{cn_big(int(m[2]))}{tail}"
@@ -357,9 +407,16 @@ def date_key(when: str) -> tuple[int, int, int]:
     return 13, 0, 0
 
 
-def parse_override(value: str) -> tuple[int, str] | None:
+def parse_override(value: str) -> tuple[int | None, str] | None:
     """系:1097-11-01 / 1097-01 / 1097-秋 / 1097-02~04 → (年, PRTS 式的时间写法)。"""
-    m = re.fullmatch(r"(\d{3,4})(?:-(?:(春|夏|秋|冬)|(\d{1,2})~(\d{1,2})|(\d{1,2})(?:-(\d{1,2}))?))?", value)
+    if value == "塔前":
+        return 0, "塔罗斯历以前"
+    if value == "塔不书":
+        return None, "年份不书"
+    talos = value.startswith("塔")
+    value = value.removeprefix("塔")
+    year_pattern = r"[1-9]\d*" if talos else r"\d{3,4}"
+    m = re.fullmatch(rf"({year_pattern})(?:-(?:(春|夏|秋|冬)|(\d{{1,2}})~(\d{{1,2}})|(\d{{1,2}})(?:-(\d{{1,2}}))?))?", value)
     if not m:
         return None
     y = int(m[1])
@@ -377,9 +434,11 @@ def parse_override(value: str) -> tuple[int, str] | None:
 class Entry:
     def __init__(self, ids: list[str], where: str):
         self.ids, self.where = ids, where
+        self.bian = TERRA
+        self.source_order = (where, 0)
         self.sup = ids[0].startswith("补")          # 补条：年表没有的事
         self.region: str | None = None             # 是岁:地区
-        self.moved: tuple[int, str] | None = None  # 系:…（改系后的年份和时间写法）
+        self.moved: tuple[int | None, str] | None = None  # 系:…（改系后的年份和时间写法）
         self.minor = False                         # 附：附记
         self.cunmu = False                         # 存目：不入正文
         self.shi: list[str] = []                   # 事:…（归属的纪事本末）
@@ -458,7 +517,7 @@ class Entry:
     @property
     def vol(self):
         """这条所在的卷：网页链接用。"""
-        return self.merged or self.year
+        return self.merged or (f"塔{self.year}" if self.bian == TALOS else self.year)
 
     def sort_key(self) -> tuple:
         key = date_key(self.system_when)
@@ -471,7 +530,7 @@ class Entry:
     def when(self, short: bool = False) -> str:
         if self.merged:
             return self.section if short else self.section + (self.day or "")
-        y = f"{cn_year(self.year)}年"
+        y = ("塔罗斯历" if self.bian == TALOS else "") + f"{cn_year(self.year)}年"
         if self.section == "是岁":
             return y if short else f"{y}（月日不详）"
         if self.day == "是月":
@@ -494,22 +553,31 @@ def parse_entries(path: Path, probs: Problems) -> list[Entry]:
                 continue
             ids = [m[1].replace("：", ":")] if m[1].startswith("补") else [i.strip() for i in m[1].split(",")]
             e = Entry(ids, where)
+            e.bian = volume_bian(path.parent.name)
+            e.source_order = (path.name, no)
             out.append(e)
             for tok in m[2].split():
                 key, _, val = tok.replace("：", ":").partition(":")
                 if key == "是岁" and val:
                     e.region = val
                 elif key == "系" and val:
+                    if val.startswith("塔") != (e.bian == TALOS):
+                        probs.add(where, f"{e.bian}不能使用另一编的系年：{tok}")
                     e.moved = parse_override(val)
                     if not e.moved:
                         probs.add(where, f"系日写法不对：{tok}（例：系:1097-11-01、系:1097-01、系:1097-秋）")
                 elif key == "事" and val:
                     e.shi += [v for v in val.split(",") if v]
                 elif key == "传" and val:
-                    e.zhuan += [canon(v) for v in val.split(",") if v]
+                    e.zhuan += [person_name(v, e.bian, probs, where) for v in val.split(",") if v]
                 elif key == "次" and re.fullmatch(r"ev\d+", val):
-                    e.after = val
+                    if e.bian == TALOS:
+                        probs.add(where, "塔卫二编按系年与文件顺序排列，暂不支持 次:")
+                    else:
+                        e.after = val
                 elif tok == "不系年":
+                    if e.bian == TALOS:
+                        probs.add(where, "塔卫二编年份不书须写 系:塔不书，放入 塔卫二前纪/")
                     e.moved = (None, "不系年")
                 elif tok == "月末":
                     e.tail = True
@@ -527,6 +595,8 @@ def parse_entries(path: Path, probs: Problems) -> list[Entry]:
                 elif placement(e.moved[1])[0] == "是岁" and not e.region:
                     probs.add(where, f"{ids[0]} 只知年份，要同时写 是岁:地区")
                 continue
+            if e.bian == TALOS:
+                probs.add(where, "塔卫二编条目只能用 @条 补:名称")
             unknown = [i for i in e.ids if i not in events()]
             for i in unknown:
                 probs.add(where, f"没有这个事件：{i}")
@@ -534,12 +604,23 @@ def parse_entries(path: Path, probs: Problems) -> list[Entry]:
             if not e.region and not e.moved and yearly and len(yearly) == len(e.ids) - len(unknown):
                 probs.add(where, f"{e.ids[0]} 只知年份，要写成 @条 {e.ids[0]} 是岁:地区")
         elif out:
-            out[-1].lines.append((where, raw))
+            out[-1].lines.append((where, person_links(raw, out[-1].bian, probs, where)
+                                  if not raw.lstrip().startswith("@") else raw))
         elif raw.strip() and not raw.startswith("<!--"):
             probs.add(where, "第一条 @条 之前不能有正文")
     for e in out:
         e.groups = parse_groups(e, probs)
         e.place()
+        if e.bian == TALOS:
+            vol = path.parent.name
+            dated_year = e.moved[0] if e.moved else None
+            target = TALOS_PRE if dated_year is None or dated_year < TALOS_PRESENT else f"塔{dated_year}"
+            e.year = dated_year if vol == TALOS_PRE else int(vol[1:])
+            if vol != target:
+                probs.add(e.where, f"{e.anchor} 系年与卷不一致，条目要放到 data/annals/{target}/")
+            if vol == TALOS_PRE:
+                e.merged = TALOS_PRE
+                e.place_merged()
         tag = ",".join(e.ids)
         has_kaoyi = any(g["kaoyi"] for g in e.groups)
         if e.minor and e.cunmu:
@@ -623,7 +704,10 @@ def volume_years() -> list:
     """全部卷，按年代先后：合卷在前，然后一年一卷。"""
     merged = [k for k in MERGED if (SRC_DIR / k).is_dir() and k != "不系年"]
     tail = ["不系年"] if (SRC_DIR / "不系年").is_dir() else []
-    return merged + sorted(int(p.name) for p in SRC_DIR.iterdir() if p.is_dir() and p.name.isdigit()) + tail
+    talos_pre = [TALOS_PRE] if (SRC_DIR / TALOS_PRE).is_dir() else []
+    talos = sorted((p.name for p in SRC_DIR.iterdir() if p.is_dir() and re.fullmatch(r"塔[1-9]\d*", p.name)),
+                   key=lambda name: int(name[1:]))
+    return merged + sorted(int(p.name) for p in SRC_DIR.iterdir() if p.is_dir() and p.name.isdigit()) + tail + talos_pre + talos
 
 
 @cache
@@ -639,15 +723,21 @@ def sup_ids() -> frozenset[str]:
 
 
 def volume_title(year) -> str:
+    if year == TALOS_PRE:
+        return "塔卫二前纪 · 塔罗斯历一五二年以前"
+    if volume_bian(year) == TALOS:
+        return f"塔罗斯历{cn_year(int(year[1:]))}年"
     return MERGED[year][0] if year in MERGED else f"泰拉历{cn_year(year)}年"
 
 
-def load_volume(year: int, probs: Problems) -> list[Entry]:
+def load_volume(year: int | str, probs: Problems) -> list[Entry]:
     """读一卷的全部条目，按卷中顺序排好。漏写和重复在 build 里跨卷检查。"""
     entries: list[Entry] = []
     for part in sorted((SRC_DIR / str(year)).glob("*.md")):
         entries += parse_entries(part, probs)
     for e in entries:
+        if e.bian == TALOS:
+            continue  # 系年与卷的校验在 parse_entries，单文件 check 也要检查
         if year in MERGED:
             e.merged = year
             first = next((events()[i] for i in e.ids if i in events()), None)
@@ -671,6 +761,8 @@ def load_volume(year: int, probs: Problems) -> list[Entry]:
 
 def order_entries(entries: list[Entry]) -> list[Entry]:
     """有日期的按系日排，同日按年表先后；只知年份的放到卷末，按地区分组，地区按首次出现排。"""
+    if entries and entries[0].bian == TALOS:
+        return sorted(entries, key=talos_order)
     if entries and entries[0].merged:
         return sorted(entries, key=lambda e: e.order)
     dated = sorted((e for e in entries if not e.region), key=Entry.sort_key)
@@ -695,18 +787,22 @@ def sections(entries: list[Entry]) -> list[dict]:
 # ---------------------------------------------------------------- 纪事本末
 
 
-def load_benmo(probs: Problems) -> list[dict]:
+def load_benmo(probs: Problems, bian: str | None = None) -> list[dict]:
     """纪事本末.md：@事 名称 / @线 剧情组… / @加 事件… / @减 事件…，其后是本末概述。"""
-    path = SRC_DIR / "纪事本末.md"
+    if bian is None:
+        return load_benmo(probs, TERRA) + load_benmo(probs, TALOS)
+    path = SRC_DIR / ("纪事本末-塔卫二.md" if bian == TALOS else "纪事本末.md")
     if not path.exists():
         return []
     out: list[dict] = []
     for no, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         s = raw.strip()
         if s.startswith("@事 "):
-            out.append({"title": s[3:].strip(), "threads": set(), "add": set(), "drop": set(), "summary": []})
+            out.append({"title": s[3:].strip(), "bian": bian, "threads": set(), "add": set(), "drop": set(), "summary": []})
         elif not out:
             continue  # 文件开头的说明
+        elif bian == TALOS and s.startswith(("@线 ", "@加 ", "@减 ")):
+            probs.add(f"{path.name}:{no}", "塔卫二本末只用条目的 事: 收录，不适用 @线/@加/@减")
         elif s.startswith("@线 "):
             out[-1]["threads"] |= set(s[3:].split())
         elif s.startswith("@加 "):
@@ -716,7 +812,7 @@ def load_benmo(probs: Problems) -> list[dict]:
         elif s.startswith("@"):
             probs.add(f"纪事本末.md:{no}", f"不认识的指令：{s[:10]}")
         elif s:
-            out[-1]["summary"].append(s)
+            out[-1]["summary"].append(person_links(s, bian, probs, f"{path.name}:{no}"))
     for b in out:
         for i in b["add"] | b["drop"]:
             if i not in events():
@@ -736,14 +832,22 @@ def by_thread(b: dict, e: Entry) -> bool:
 
 def chrono(e: Entry) -> tuple:
     """跨卷排序：逐年排列，只知年份的放在当年末尾。"""
+    if e.bian == TALOS:
+        return 1, talos_order(e)
     if e.merged:
-        return (9999 if e.merged == "不系年" else list(MERGED).index(e.merged)), 0, e.order
-    return 100 + e.year, bool(e.region), e.sort_key()
+        return 0, ((9999 if e.merged == "不系年" else list(MERGED).index(e.merged)), 0, e.order)
+    return 0, (100 + e.year, bool(e.region), e.sort_key())
+
+
+def talos_order(e: Entry) -> tuple:
+    return (e.year if e.year is not None else TALOS_PRESENT - 0.5), bool(e.region), e.sort_key()[0], e.source_order
 
 
 def benmo_members(b: dict, entries: list[Entry]) -> list[Entry]:
     """条目写了 事: 的，只算写明的那几件事；没写的按故事线自动归入（附记不自动归入）；存目一律不收。"""
     def hit(e: Entry) -> bool:
+        if e.bian != b.get("bian", TERRA):
+            return False
         if e.cunmu:
             return False
         if e.shi:
@@ -797,16 +901,20 @@ def add_intros(entries: list[Entry], renwu: dict[str, str]) -> list[str]:
     return missing
 
 
-def load_liezhuan(probs: Problems) -> list[dict]:
+def load_liezhuan(probs: Problems, bian: str | None = None) -> list[dict]:
     """列传.md：@传 人物，其后是概述。"""
-    path = SRC_DIR / "列传.md"
+    if bian is None:
+        return load_liezhuan(probs, TERRA) + load_liezhuan(probs, TALOS)
+    path = SRC_DIR / ("列传-塔卫二.md" if bian == TALOS else "列传.md")
     if not path.exists():
         return []
     out: list[dict] = []
     for no, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         s = raw.strip()
         if s.startswith("@传 "):
-            out.append({"name": s[3:].strip(), "summary": []})
+            name = s[3:].strip()
+            out.append({"name": person_name(name, bian, probs, f"{path.name}:{no}") if bian == TALOS else name,
+                        "bian": bian, "summary": []})
             if out[-1]["name"] not in characters():
                 probs.add(f"列传.md:{no}", f"人物页里没有「{out[-1]['name']}」，名字要与网页人物页一致")
         elif not out:
@@ -816,7 +924,7 @@ def load_liezhuan(probs: Problems) -> list[dict]:
         elif s.startswith("@"):
             probs.add(f"列传.md:{no}", f"不认识的指令：{s[:10]}")
         elif s:
-            out[-1]["summary"].append(s)
+            out[-1]["summary"].append(person_links(s, bian, probs, f"{path.name}:{no}"))
     return out
 
 
@@ -844,15 +952,22 @@ def index_rows(pattern: str, fields: tuple[str, ...]) -> list[tuple[str, dict]]:
     return rows
 
 
-def zhuan_index(probs: Problems, anchors: set[str], names: set[str], pattern: str = "列传索引-*.md") -> dict[str, dict]:
+def zhuan_index(probs: Problems, anchors: set[str], names: set[str], pattern: str = "列传索引-*.md",
+                bian: str = TERRA) -> dict[str, dict]:
     out: dict[str, dict] = {}
+    if bian == TALOS and pattern == "列传索引-*.md":
+        pattern = "列传索引-塔卫二.md"
     for where, r in index_rows(pattern, ZHUAN_FIELDS):
+        if bian == TERRA and where.startswith("列传索引-塔卫二.md:"):
+            continue
+        if bian == TALOS:
+            r["name"] = person_name(r["name"], bian, probs, where)
         name = r["name"]
         if name not in names:
             probs.add(where, f"列传里没有「{name}」")
         if name in out:
             probs.add(where, f"「{name}」重复")
-        if r["origin"] not in ORIGINS:
+        if bian == TERRA and r["origin"] not in ORIGINS:
             probs.add(where, f"{name}：出身「{r['origin']}」要写 {'、'.join(ORIGINS)} 之一")
         if r["fate"] not in FATES:
             probs.add(where, f"{name}：身后「{r['fate']}」要写 {'、'.join(FATES)} 之一")
@@ -868,9 +983,9 @@ def zhuan_index(probs: Problems, anchors: set[str], names: set[str], pattern: st
     return out
 
 
-def benmo_index(probs: Problems, titles: set[str]) -> dict[str, dict]:
+def benmo_index(probs: Problems, titles: set[str], bian: str = TERRA) -> dict[str, dict]:
     out: dict[str, dict] = {}
-    for where, r in index_rows("本末索引.md", BENMO_FIELDS):
+    for where, r in index_rows("本末索引-塔卫二.md" if bian == TALOS else "本末索引.md", BENMO_FIELDS):
         if r["title"] not in titles:
             probs.add(where, f"纪事本末里没有「{r['title']}」")
         if r["kind"] not in BENMO_KINDS:
@@ -885,10 +1000,14 @@ def benmo_index(probs: Problems, titles: set[str]) -> dict[str, dict]:
 def check_index(path: str) -> int:
     """python -m pipeline.annals idx <列传索引文件>：只查这个文件的格式和取值。"""
     probs = Problems()
-    anchors = {e.anchor for year in volume_years() for e in load_volume(year, Problems())}
-    rows = zhuan_index(probs, anchors, {z["name"] for z in load_liezhuan(Problems())}, Path(path).name)
+    bian = TALOS if Path(path).name == "列传索引-塔卫二.md" else TERRA
+    anchors = {e.anchor for year in volume_years() if volume_bian(year) == bian
+               for e in load_volume(year, Problems())}
+    rows = zhuan_index(probs, anchors, {z["name"] for z in load_liezhuan(probs, bian)}, Path(path).name, bian)
     for p in probs:
         print("  !", p)
+    for note in dict.fromkeys(probs.notes):
+        print("  ~", note)
     print(f"{len(rows)} 行，问题 {len(probs)} 处")
     return 1 if probs else 0
 
@@ -1336,7 +1455,7 @@ def check_wu(path: Path) -> int:
 
 def entry_json(e: Entry, benmo_titles: list[str]) -> dict:
     return {
-        "id": e.anchor, "ids": e.ids, "year": e.vol, "when": e.when(),
+        "id": e.anchor, "ids": e.ids, "year": e.vol, "when": e.when(), "bian": e.bian,
         "threads": sorted({events()[i]["thread"] for i in e.ids if i in events()}),
         "benmo": benmo_titles, "zhuan": e.zhuan, "groups": e.groups, "minor": e.minor, "sup": e.sup,
         "moved": e.prts_when if e.is_moved else None,
@@ -1395,6 +1514,20 @@ def entry_md(e: Entry) -> list[str]:
     return out
 
 
+def check_memberships(entries: list[Entry], benmo: list[dict], liezhuan: list[dict], probs: Problems):
+    for label, docs, field, tag in (("纪事本末", benmo, "title", "shi"), ("列传", liezhuan, "name", "zhuan")):
+        keys = {(doc["bian"], doc[field]) for doc in docs}
+        if len(keys) != len(docs):
+            probs.add(label, "同编内名称重复")
+        for e in entries:
+            for value in getattr(e, tag):
+                if (e.bian, value) not in keys:
+                    if any(name == value for _, name in keys):
+                        probs.add(e.where, f"{label}「{value}」属于另一编，不能混收{e.bian}条目")
+                    else:
+                        probs.add(e.where, f"{label}里没有「{value}」")
+
+
 def build(quiet: bool = False) -> int:
     probs = Problems()
     benmo = load_benmo(probs)
@@ -1403,6 +1536,7 @@ def build(quiet: bool = False) -> int:
         vprobs = Problems()
         entries = load_volume(year, vprobs)
         probs += vprobs
+        probs.notes += vprobs.notes
         all_entries += entries
         volumes.append((year, entries))
     # 漏写和重复跨卷检查：改系到别的年份的事件，在新的那一卷里算数
@@ -1421,17 +1555,10 @@ def build(quiet: bool = False) -> int:
     wu_notes: list[str] = []
     wu_items = load_wu(probs, wu_notes)
     no_intro: list[str] = []
-    titles, names = {b["title"] for b in benmo}, {z["name"] for z in liezhuan}
-    for e in all_entries:
-        for t in e.shi:
-            if t not in titles:
-                probs.add(e.where, f"纪事本末里没有「{t}」")
-        for n in e.zhuan:
-            if n not in names:
-                probs.add(e.where, f"列传里没有「{n}」")
-    members = {b["title"]: benmo_members(b, all_entries) for b in benmo}
+    check_memberships(all_entries, benmo, liezhuan, probs)
+    members = {(b["bian"], b["title"]): benmo_members(b, all_entries) for b in benmo}
     belongs: dict[int, list[str]] = {}
-    for title, es in members.items():
+    for (_, title), es in members.items():
         for e in es:
             belongs.setdefault(id(e), []).append(title)
 
@@ -1451,7 +1578,7 @@ def build(quiet: bool = False) -> int:
                                 + "".join(k["text"] for k in g["kaoyi"]))) for e in entries for g in e.groups)
         n_gang = sum(len(e.groups) for e in entries)
         data["volumes"].append({
-            "year": year, "title": volume_title(year),
+            "year": year, "title": volume_title(year), "bian": volume_bian(year),
             "stats": {"entries": len(entries), "gang": n_gang, "quotes": n_quotes, "prose": prose, "quote_chars": q_chars},
             "sections": [{"label": s["label"], "days": [
                 {"label": d["label"], "entries": [entry_json(e, belongs.get(id(e), [])) for e in d["entries"]]}
@@ -1481,32 +1608,36 @@ def build(quiet: bool = False) -> int:
             if hits:
                 print(f"  ~ 书法：纲目里有 {sum(hits.values())} 处不合用词（{'、'.join(f'{w}×{n}' for w, n in hits.most_common())}），"
                       f"用 check 看具体位置")
-    index_b = benmo_index(probs, titles)
-    index_z = zhuan_index(probs, {e.anchor for e in all_entries}, names)
-    for title in sorted(titles - index_b.keys()):
-        probs.add("本末索引.md", f"「{title}」还没有索引")
-    for name in sorted(names - index_z.keys()):
-        probs.add("列传索引", f"「{name}」还没有索引")
+    index_b, index_z = {}, {}
+    for bian in (TERRA, TALOS):
+        b_titles = {b["title"] for b in benmo if b["bian"] == bian}
+        z_names = {z["name"] for z in liezhuan if z["bian"] == bian}
+        index_b[bian] = benmo_index(probs, b_titles, bian)
+        index_z[bian] = zhuan_index(probs, {e.anchor for e in all_entries if e.bian == bian}, z_names, bian=bian)
+        for title in sorted(b_titles - index_b[bian].keys()):
+            probs.add(bian + "本末索引", f"「{title}」还没有索引")
+        for name in sorted(z_names - index_z[bian].keys()):
+            probs.add(bian + "列传索引", f"「{name}」还没有索引")
     for b in benmo:
-        es = members[b["title"]]
+        es = members[b["bian"], b["title"]]
         if not es:
             probs.add("纪事本末.md", f"{b['title']}：一条也没有")
             continue
         data["benmo"].append({
-            "title": b["title"], "summary": b["summary"], "span": [es[0].when(True), es[-1].when(True)],
-            "entries": [{"year": e.vol, "id": e.anchor} for e in es], "index": index_b.get(b["title"]),
+            "title": b["title"], "summary": b["summary"], "span": [es[0].when(True), es[-1].when(True)], "bian": b["bian"],
+            "entries": [{"year": e.vol, "id": e.anchor} for e in es], "index": index_b[b["bian"]].get(b["title"]),
         })
         if not quiet:
             print(f"纪事本末「{b['title']}」：{len(es)} 条，{es[0].when(True)} 至 {es[-1].when(True)}")
     for z in liezhuan:
-        es = sorted((e for e in all_entries if z["name"] in e.zhuan and not e.cunmu), key=chrono)
+        es = sorted((e for e in all_entries if e.bian == z["bian"] and z["name"] in e.zhuan and not e.cunmu), key=chrono)
         others = sorted((e for e in all_entries if z["name"] in e.people() and z["name"] not in e.zhuan
-                         and not e.cunmu), key=chrono)
+                         and not e.cunmu and e.bian == z["bian"]), key=chrono)
         data["liezhuan"].append({
-            "name": z["name"], "summary": z["summary"],
+            "name": z["name"], "summary": z["summary"], "bian": z["bian"],
             "span": [es[0].when(True), es[-1].when(True)] if es else None,
             "entries": [{"year": e.vol, "id": e.anchor} for e in es],
-            "others": [{"year": e.vol, "id": e.anchor} for e in others], "index": index_z.get(z["name"]),
+            "others": [{"year": e.vol, "id": e.anchor} for e in others], "index": index_z[z["bian"]].get(z["name"]),
         })
         if not quiet:
             print(f"列传「{z['name']}」：{len(es)} 条，其他出场 {len(others)} 条")
@@ -1528,6 +1659,8 @@ def build(quiet: bool = False) -> int:
               f"和 {OUT_DIR.relative_to(ROOT)}/")
     for p in probs:
         print("  !", p)
+    for note in dict.fromkeys(probs.notes):
+        print("  ~", note)
     return 1 if probs else 0
 
 
@@ -1538,16 +1671,8 @@ def check(path: str) -> int:
         return check_wu(resolved)
     probs = Problems()
     entries = parse_entries(resolved, probs)
-    titles = {b["title"] for b in load_benmo(probs)}
-    names = {z["name"] for z in load_liezhuan(probs)}
-    for e in entries:
-        for t in e.shi:
-            if t not in titles:
-                probs.add(e.where, f"纪事本末里没有「{t}」（可用：{'、'.join(sorted(titles))}）")
-        for n in e.zhuan:
-            if n not in names:
-                probs.add(e.where, f"列传里没有「{n}」")
-    notes = []
+    check_memberships(entries, load_benmo(probs), load_liezhuan(probs), probs)
+    notes = list(probs.notes)
     for e in order_entries(entries):
         prose = sum(len(re.sub(r"\s", "", g["gang"] + "".join(g["mu"]) + "".join(k["text"] for k in g["kaoyi"])))
                     for g in e.groups)

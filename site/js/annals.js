@@ -1,7 +1,7 @@
 // 编年史：左侧是卷目和月份，右侧按卷连读。考异默认折叠。条目的渲染也给列传、纪事本末用。
 // 路由：#/annals/1097（一卷）、#/annals/1097?e=ev0536（跳到某条）、#/annals/1097?s=正月（跳到某月）
 import { D } from './data.js';
-import { esc, href, charChip, charOf, pageHead } from './util.js';
+import { esc, href, charChip, charOf, charName, charMark, pageHead } from './util.js';
 
 let side, content, shown = null;
 
@@ -37,7 +37,7 @@ export function unmount() {
 
 function renderSide(vol) {
   // 前纪、外纪在主线之前：分两段显示
-  const group = (v) => (v.year === '不系年' ? '不系年' : typeof v.year === 'number' && v.year >= 1096 ? '主线' : '前纪与外纪');
+  const group = (v) => v.bian ?? '泰拉编';
   const vols = D.annals.volumes.map((v, i, all) => {
     const head = i === 0 || group(all[i - 1]) !== group(v) ? `<div class="an-vol-group muted">${group(v)}</div>` : '';
     const active = vol && v.year === vol.year;
@@ -67,6 +67,7 @@ function renderVolume(v) {
   content.innerHTML = `${pageHead({
     en: `VOLUME ${String(i + 1).padStart(2, '0')}/${D.annals.volumes.length}`,
     title: v.title,
+    sub: esc(v.bian ?? '泰拉编'),
     nums: [
       ['条目', st.entries, '条', 'ENTRIES'], ['纲目', st.gang, '组', 'HEADINGS'], ['原文', st.quotes, '段', 'QUOTES'],
       ['撰文', st.prose, '字', 'WRITTEN'], ['引文', st.quote_chars, '字', 'CITED'],
@@ -134,8 +135,8 @@ export function jumpToEntry(box, params) {
 export function entryHtml(e, withWhen = false) {
   const evLinks = e.ids.filter((i) => D.eventById[i])
     .map((i) => `<a href="${href.event(i)}">时间轴：${esc(D.eventById[i].when)}</a>`);
-  const benmo = e.benmo.map((t) => `<a href="${href.benmo(t)}">纪事本末：${esc(t)}</a>`);
-  benmo.push(...(e.zhuan ?? []).map((n) => `<a href="${href.zhuan(n)}">列传：${esc(n)}传</a>`));
+  const benmo = e.benmo.map((t) => `<a href="${href.benmo(t, e.bian)}">纪事本末：${esc(t)}</a>`);
+  benmo.push(...(e.zhuan ?? []).map((n) => `<a href="${href.zhuan(n, e.bian)}">列传：${esc(charName(n))}传${charMark(n)}</a>`));
   if (e.minor) {
     // 附记：只有纲和考异，小字附在当日
     return `<article class="an-entry minor" id="an-${e.id}">
@@ -164,7 +165,7 @@ export function inline(s, other) {
   return esc(s)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, name, label) => (charOf(name)
-      ? `<a class="an-p" href="${href.char(name)}">${label ?? name}</a>` : (other?.(name, label) ?? label ?? name)));
+      ? `<a class="an-p" href="${href.char(name)}">${label ?? charName(name)}${charMark(name)}</a>` : (other?.(name, label) ?? label ?? name)));
 }
 
 function personChip(token) {
@@ -184,9 +185,9 @@ export function quoteHtml(q) {
 }
 
 function quoteLine([k, sp, t]) {
-  if (k === 'd') return `<div class="ql d">${sp ? `<span class="sp">${esc(sp)}</span>` : ''}<span>${esc(t)}</span></div>`;
+  if (k === 'd') return `<div class="ql d">${sp ? `<span class="sp">${esc(charName(sp))}${charMark(sp)}</span>` : ''}<span>${esc(t)}</span></div>`;
   if (k === 'n') return `<div class="ql n">${esc(t)}</div>`;
-  if (k === 'c') return `<div class="ql d c"><span class="sp">${esc(sp)}（选项）</span><span>${esc(t)}</span></div>`;
+  if (k === 'c') return `<div class="ql d c"><span class="sp">${esc(charName(sp))}${charMark(sp)}（选项）</span><span>${esc(t)}</span></div>`;
   if (k === 's') return `<div class="ql s">${esc(t)}</div>`;
   return '';
 }

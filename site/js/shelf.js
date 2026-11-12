@@ -4,8 +4,8 @@
 //      items()：[{ key, url, name, text（搜索用）, facets: {索引项: [值]}, line（索引页的一行身份）, tags（一行短标签）, n（条数）, sort: {排序名: 值} }]
 //      facets：[{ key, order?（固定顺序）, open?, was?（改名前的旧名，收藏过的旧链接还能用） }]；groups：可选的分组；sorts：[排序名]，第一个是默认
 //      resolve(key)：地址里的名字 → item；detail(item, el, params)：渲染单篇
-import { D } from './data.js';
-import { esc, pageHead } from './util.js';
+import { D, BIANS } from './data.js';
+import { esc, charName, pageHead } from './util.js';
 
 export const OPTION_NONE = '不分组';
 const OPTION_GROUP = '分组', OPTION_SORT = '排序', OPTION_Q = 'q';
@@ -17,11 +17,12 @@ export function makeShelf(cfg) {
   let state = freshState();
 
   function freshState() {
-    return { q: '', group: cfg.groups[0], sort: cfg.sorts[0], picks: {} };
+    return { bian: BIANS[0], q: '', group: cfg.groups[0], sort: cfg.sorts[0], picks: {} };
   }
 
   function readState(params) {
     state = freshState();
+    if (BIANS.includes(params.get('bian'))) state.bian = params.get('bian');
     state.q = params.get(OPTION_Q) ?? '';
     const group = cfg.facets.find((f) => f.was && f.was === params.get(OPTION_GROUP))?.key ?? params.get(OPTION_GROUP);
     state.group = cfg.groups.includes(group) ? group : cfg.groups[0];
@@ -36,6 +37,7 @@ export function makeShelf(cfg) {
   function indexUrl(change = {}) {
     const next = { ...state, picks: { ...state.picks }, ...change };
     const p = new URLSearchParams();
+    if (next.bian !== BIANS[0]) p.set('bian', next.bian);
     if (next.q) p.set(OPTION_Q, next.q);
     if (next.group !== cfg.groups[0]) p.set(OPTION_GROUP, next.group);
     if (next.sort !== cfg.sorts[0]) p.set(OPTION_SORT, next.sort);
@@ -56,6 +58,7 @@ export function makeShelf(cfg) {
 
   // skip：算某一项的计数时，不算这一项自己的筛选，这样同项的其他值还能看到数字
   function matches(item, skip) {
+    if ((item.bian ?? BIANS[0]) !== state.bian) return false;
     const q = state.q.trim().toLowerCase();
     if (q && !item.text.includes(q)) return false;
     return Object.entries(state.picks).every(([k, set]) => k === skip || (item.facets[k] ?? []).some((v) => set.has(v)));
@@ -79,7 +82,7 @@ export function makeShelf(cfg) {
         if (matches(it, f.key)) for (const v of it.facets[f.key] ?? []) counts.set(v, (counts.get(v) ?? 0) + 1);
       }
       for (const v of state.picks[f.key] ?? []) if (!counts.has(v)) counts.set(v, 0);
-      const vals = f.order ? f.order.filter((v) => counts.has(v))
+      const vals = f.order ? f.order.filter((v) => counts.has(v)).concat([...counts.keys()].filter((v) => !f.order.includes(v)))
         : [...counts.keys()].sort((a, b) => counts.get(b) - counts.get(a) || collator.compare(a, b));
       const picked = state.picks[f.key]?.size;
       const isOpen = first ? f.open || picked : open.has(f.key) || picked;
@@ -93,8 +96,9 @@ export function makeShelf(cfg) {
   function renderList(activeKey) {
     const list = results();
     const filtered = state.q || Object.keys(state.picks).length;
-    side.querySelector('.shelf-count').innerHTML = `${filtered ? `筛出 ${list.length} / ${items.length} ${cfg.unit}` : `共 ${items.length} ${cfg.unit}`}
-      ${filtered ? `<a class="shelf-clear" href="#/${cfg.route}">清除</a>` : ''}`;
+    const total = items.filter((it) => (it.bian ?? BIANS[0]) === state.bian).length;
+    side.querySelector('.shelf-count').innerHTML = `${filtered ? `筛出 ${list.length} / ${total} ${cfg.unit}` : `共 ${total} ${cfg.unit}`}
+      ${filtered ? `<a class="shelf-clear" href="${indexUrl({ q: '', picks: {} })}">清除</a>` : ''}`;
     side.querySelector('.shelf-list').innerHTML = list.map((it) => `
       <a class="list-item${it.key === activeKey ? ' active' : ''}" href="${esc(it.url)}">
         <span class="grow">${esc(it.name)}</span><span class="n">${it.n} 条</span></a>`).join('')
@@ -119,7 +123,8 @@ export function makeShelf(cfg) {
     const tally = (v) => list.filter((it) => it.facets[hn.facet]?.includes(v)).length;
     content.innerHTML = `${pageHead({
       en: 'INDEX',
-      title: cfg.title,
+    title: cfg.title,
+    sub: esc(state.bian),
       note: cfg.intro,
       nums: hn.order.map((v) => [hn.label?.(v) ?? v, tally(v), hn.unit, hn.unitEn]),
     })}<div class="an-body shelf-index">
@@ -144,15 +149,20 @@ export function makeShelf(cfg) {
   function update(r) {
     if (!content) return;
     const [key] = r.parts;
-    const item = key ? cfg.resolve(key) : null;
+    const requestedBian = r.params.get('bian') ?? (key?.startsWith('终末地·') ? BIANS[1] : BIANS[0]);
+    const item = key ? cfg.resolve(key, requestedBian) : null;
     if (item) {
       // 看单篇时，左栏保留进来时的筛选
       if ([...r.params.keys()].some((k) => k !== 'e')) readState(r.params);
+      if (state.bian !== (item.bian ?? BIANS[0])) {
+        state = freshState();
+        state.bian = item.bian ?? BIANS[0];
+      }
       syncControls();
       renderFacets();
       renderList(item.key);
-      if (shown !== item.key) {
-        shown = item.key;
+      if (shown !== `${item.bian}:${item.key}`) {
+        shown = `${item.bian}:${item.key}`;
         cfg.detail(item, content, links());
       }
       cfg.jump(content, r.params);
@@ -168,11 +178,12 @@ export function makeShelf(cfg) {
   // 单篇页面上的链接：回到进来时的索引；点标签只按这一项筛选
   const links = () => ({
     back: indexUrl(),
-    filter: (facet, value) => `#/${cfg.route}?${new URLSearchParams({ [facet]: value })}`,
+    filter: (facet, value) => `#/${cfg.route}?${new URLSearchParams({ bian: state.bian, [facet]: value })}`,
   });
 
   function syncControls() {
     const q = side.querySelector('.shelf-q');
+    side.querySelector('.shelf-bian').value = state.bian;
     if (document.activeElement !== q) q.value = state.q;
     side.querySelector('[data-opt=group]').value = state.group;
     side.querySelector('[data-opt=sort]').value = state.sort;
@@ -186,6 +197,7 @@ export function makeShelf(cfg) {
     }
     el.innerHTML = `
       <aside class="side panel shelf-side">
+        <label>编 <select class="shelf-bian">${BIANS.map((b) => `<option>${esc(b)}</option>`).join('')}</select></label>
         <input class="shelf-q" type="search" placeholder="${esc(cfg.placeholder)}">
         <div class="shelf-opts">
           <label>分组 <select data-opt="group">${cfg.groups.map((g) => `<option value="${esc(g)}">${esc(g === OPTION_NONE ? '不分组' : g)}</option>`).join('')}</select></label>
@@ -198,11 +210,14 @@ export function makeShelf(cfg) {
       <section class="content panel"></section>`;
     side = el.querySelector('.shelf-side');
     content = el.querySelector('.content');
+    side.querySelector('.shelf-bian').addEventListener('change', (e) => {
+      location.hash = indexUrl({ bian: e.target.value, q: '', picks: {} });
+    });
     side.querySelector('.shelf-q').addEventListener('input', (e) => {
       state.q = e.target.value;
       renderFacets();
       if (shown) {
-        renderList(shown);
+        renderList(shown.slice(shown.indexOf(':') + 1));
       } else {
         renderList(null);
         renderIndex();
@@ -233,7 +248,7 @@ export function cnYear(year) {
 
 // 「约一〇九一年」「一〇九七年正月四日」→ 1091、1097；读不出的排在最后
 export function cnYearNumber(text) {
-  const m = String(text ?? '').match(/[〇一二三四五六七八九]{3,4}(?=年)/);
+  const m = String(text ?? '').match(/[〇一二三四五六七八九]+(?=年)/);
   return m ? Number([...m[0]].map((c) => DIGITS.indexOf(c)).join('')) : Infinity;
 }
 
@@ -244,7 +259,7 @@ export function volumeOrder() {
 
 // 概述的第一句，去掉标记，放在索引页上说明此人是谁
 export function plainFirst(summary, limit = 80) {
-  const s = (summary[0] ?? '').replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, name, label) => label ?? name).replace(/\*\*/g, '');
+  const s = (summary[0] ?? '').replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, name, label) => label ?? charName(name)).replace(/\*\*/g, '');
   const end = s.indexOf('。');
   const first = end >= 0 ? s.slice(0, end + 1) : s;
   return first.length > limit ? `${first.slice(0, limit)}……` : first;

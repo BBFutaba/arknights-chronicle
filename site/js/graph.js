@@ -3,7 +3,7 @@
 // 改筛选时已有节点留在原处，新节点从相连的节点旁边出现。人物之间的连线是共同出场的集数，
 // 集数越多，连线越粗、拉得越近。从人物或地区页点「在关系图中查看」会进入以它为中心的模式。
 import { D } from './data.js';
-import { esc, href, KIND_LABEL } from './util.js';
+import { esc, href, charName, KIND_LABEL } from './util.js';
 
 const TOP_PARTNERS = 6;   // 总览模式下每人保留的同场连线数
 const FADED = 0.1;        // 高亮时其余节点的不透明度
@@ -24,6 +24,7 @@ let hover = null, selected = null, lastClick = { id: null, t: 0 };
 let palette = {}, fadeTimer = null, fitTimer = null, fitPending = false;
 
 const epCount = (c) => c.appear.reduce((n, [, sids]) => n + sids.length, 0);
+const personLabel = (name) => `${charName(name)}${name.startsWith('终末地·') ? '〔终末地〕' : ''}`;
 // 颜色从关系图自己的平面上读：纸面和内容平面是两组值
 const css = (v) => getComputedStyle(document.querySelector('.graph-main') ?? document.documentElement).getPropertyValue(v).trim();
 const nid = (x) => (typeof x === 'object' ? x.id : x);
@@ -101,7 +102,7 @@ export function update(r) {
 
 function label(id) {
   const [type, key] = splitId(id);
-  return type === 'power' ? D.powers[key]?.name ?? key : type === 'event' ? D.eventById[key]?.when ?? key : key;
+  return type === 'power' ? D.powers[key]?.name ?? key : type === 'event' ? D.eventById[key]?.when ?? key : personLabel(key);
 }
 function splitId(id) { const i = id.indexOf(':'); return [id.slice(0, i), id.slice(i + 1)]; }
 
@@ -112,7 +113,7 @@ function collect() {
   const addChar = (n) => {
     const c = D.chars[n];
     if (!c || (c.kind === 'doctor' && !opts.doctor)) return;
-    nodes.set(`char:${n}`, { id: `char:${n}`, label: n, type: c.kind, size: epCount(c) });
+    nodes.set(`char:${n}`, { id: `char:${n}`, label: personLabel(n), type: c.kind, size: epCount(c) });
   };
   const addPower = (p) => {
     if (D.powers[p]) nodes.set(`power:${p}`, { id: `power:${p}`, label: D.powers[p].name, type: D.powers[p].kind, size: 40 });
@@ -131,7 +132,7 @@ function collect() {
     const [type, key] = splitId(focus);
     if (type === 'char' && D.chars[key]) {
       const c = D.chars[key];
-      nodes.set(focus, { id: focus, label: key, type: c.kind, size: epCount(c) });
+      nodes.set(focus, { id: focus, label: personLabel(key), type: c.kind, size: epCount(c) });
       c.co.forEach(([n]) => addChar(n));
       if (opts.powers) c.powers.forEach(addPower);
       if (opts.events) c.events.forEach(addEvent);
