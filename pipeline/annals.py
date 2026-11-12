@@ -810,16 +810,16 @@ def load_benmo(probs: Problems, bian: str | None = None) -> list[dict]:
         elif s.startswith("@减 "):
             out[-1]["drop"] |= set(s[3:].split())
         elif s.startswith("@"):
-            probs.add(f"纪事本末.md:{no}", f"不认识的指令：{s[:10]}")
+            probs.add(f"{path.name}:{no}", f"不认识的指令：{s[:10]}")
         elif s:
             out[-1]["summary"].append(person_links(s, bian, probs, f"{path.name}:{no}"))
     for b in out:
         for i in b["add"] | b["drop"]:
             if i not in events():
-                probs.add("纪事本末.md", f"{b['title']}：没有这个事件 {i}")
+                probs.add(path.name, f"{b['title']}：没有这个事件 {i}")
         for t in b["threads"]:
             if t not in groups():
-                probs.add("纪事本末.md", f"{b['title']}：没有这个剧情组 {t}")
+                probs.add(path.name, f"{b['title']}：没有这个剧情组 {t}")
     return out
 
 
@@ -916,13 +916,13 @@ def load_liezhuan(probs: Problems, bian: str | None = None) -> list[dict]:
             out.append({"name": person_name(name, bian, probs, f"{path.name}:{no}") if bian == TALOS else name,
                         "bian": bian, "summary": []})
             if out[-1]["name"] not in characters():
-                probs.add(f"列传.md:{no}", f"人物页里没有「{out[-1]['name']}」，名字要与网页人物页一致")
+                probs.add(f"{path.name}:{no}", f"人物页里没有「{out[-1]['name']}」，名字要与网页人物页一致")
         elif not out:
             continue  # 文件开头的说明
         elif s.startswith("<!--"):
             continue
         elif s.startswith("@"):
-            probs.add(f"列传.md:{no}", f"不认识的指令：{s[:10]}")
+            probs.add(f"{path.name}:{no}", f"不认识的指令：{s[:10]}")
         elif s:
             out[-1]["summary"].append(person_links(s, bian, probs, f"{path.name}:{no}"))
     return out
@@ -1615,13 +1615,13 @@ def build(quiet: bool = False) -> int:
         index_b[bian] = benmo_index(probs, b_titles, bian)
         index_z[bian] = zhuan_index(probs, {e.anchor for e in all_entries if e.bian == bian}, z_names, bian=bian)
         for title in sorted(b_titles - index_b[bian].keys()):
-            probs.add(bian + "本末索引", f"「{title}」还没有索引")
+            probs.add("本末索引-塔卫二.md" if bian == TALOS else "本末索引.md", f"「{title}」还没有索引")
         for name in sorted(z_names - index_z[bian].keys()):
-            probs.add(bian + "列传索引", f"「{name}」还没有索引")
+            probs.add("列传索引-塔卫二.md" if bian == TALOS else "列传索引.md", f"「{name}」还没有索引")
     for b in benmo:
         es = members[b["bian"], b["title"]]
         if not es:
-            probs.add("纪事本末.md", f"{b['title']}：一条也没有")
+            probs.add("纪事本末-塔卫二.md" if b["bian"] == TALOS else "纪事本末.md", f"{b['title']}：一条也没有")
             continue
         data["benmo"].append({
             "title": b["title"], "summary": b["summary"], "span": [es[0].when(True), es[-1].when(True)], "bian": b["bian"],

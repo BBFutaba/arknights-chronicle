@@ -53,6 +53,9 @@ def main():
                     f.write(json.dumps(to_record(d, reg), ensure_ascii=False) + "\n")
 
     stats = SiteExporter(reg, groups, built, events, prts_meta, data_version()).export()
+    if ef_groups:
+        endfield.write_speakers((d.ep for gid, eps in built.items() if gid.startswith("ef_") for d in eps),
+                               config.SITE_DATA / "endfield-speakers.tsv")
     if ef_audit:
         from .site import dump
         dump(config.SITE_DATA / "endfield-audit.json", ef_audit)

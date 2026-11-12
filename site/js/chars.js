@@ -1,11 +1,11 @@
 // 人物：左侧可筛选的人物列表，右侧人物卡片（档案、出场、相关事件、常同场人物）。
-import { D } from './data.js';
+import { D, BIANS } from './data.js';
 import { esc, href, KIND_LABEL, charName, charLabel, charMark, charChip, powerChip, eventItem, groupLabel, pageHead } from './util.js';
 
 const KIND_EN = { operator: 'OPERATOR', npc: 'NPC', doctor: 'DOCTOR' };
 
 const LIST_LIMIT = 600;
-let side, content, kind = 'all', sort = 'appear', q = '', power = '';
+let side, content, kind = 'all', sort = 'appear', q = '', power = '', bian = BIANS[0];
 
 const epCount = (c) => c.appear.reduce((n, [, sids]) => n + sids.length, 0);
 const epShort = (ep) => (ep.code || ep.title) + ({ 行动前: ' 前', 行动后: ' 后' }[ep.avg] ?? '');
@@ -13,6 +13,7 @@ const epShort = (ep) => (ep.code || ep.title) + ({ 行动前: ' 前', 行动后:
 export function mount(el, r) {
   el.innerHTML = `
     <aside class="side panel">
+      <label>编 <select class="ch-bian">${[...BIANS, '全部'].map((b) => `<option>${esc(b)}</option>`).join('')}</select></label>
       <input type="search" class="ch-q" placeholder="搜索人物（名字、别名、英文名）…">
       <div class="seg-ctrl ch-kind">${[['all', '全部'], ['operator', '干员'], ['npc', 'NPC']].map(([k, l]) => `<button data-k="${k}">${l}</button>`).join('')}</div>
       <select class="ch-power"><option value="">全部地区与势力</option>${Object.entries(D.powers)
@@ -27,6 +28,13 @@ export function mount(el, r) {
     <section class="content panel"></section>`;
   side = el.querySelector('.side');
   content = el.querySelector('.content');
+  side.querySelector('.ch-bian').addEventListener('change', (e) => {
+    q = power = '';
+    side.querySelector('.ch-q').value = '';
+    side.querySelector('.ch-power').value = '';
+    side.querySelector('.ch-power-link').hidden = true;
+    location.hash = `#/chars?${new URLSearchParams({ bian: e.target.value })}`;
+  });
   const qi = side.querySelector('.ch-q');
   qi.value = q;
   qi.addEventListener('input', () => { q = qi.value.trim(); renderList(); });
@@ -51,7 +59,13 @@ export function mount(el, r) {
 
 export function update(r) {
   const asked = r.parts[0] && (D.chars[r.parts[0]] ? r.parts[0] : D.charAlias[r.parts[0]]);
-  const name = asked || '阿米娅';
+  const requested = r.params.get('bian');
+  bian = asked ? (asked.startsWith('终末地·') ? BIANS[1] : BIANS[0])
+    : [...BIANS, '全部'].includes(requested) ? requested : BIANS[0];
+  // 全部列表中的人物链接保留混排，其他直达链接按人物键推断所属编。
+  if (asked && requested === '全部') bian = '全部';
+  side.querySelector('.ch-bian').value = bian;
+  const name = asked || (bian === BIANS[1] ? '终末地·管理员' : '阿米娅');
   renderList(name);
   renderProfile(name);
   content.scrollTop = 0;
@@ -62,7 +76,8 @@ function renderList(activeName) {
   side.querySelectorAll('.ch-kind button').forEach((b) => b.classList.toggle('active', b.dataset.k === kind));
   const ql = q.toLowerCase();
   let arr = Object.entries(D.chars).filter(([n, c]) =>
-    (kind === 'all' ? c.kind !== 'doctor' || !q : c.kind === kind)
+    (bian === '全部' || n.startsWith('终末地·') === (bian === BIANS[1]))
+    && (kind === 'all' ? c.kind !== 'doctor' || !q : c.kind === kind)
     && (!power || c.powers.includes(power))
     && (!q || [n, ...c.aliases, c.appellation].some((s) => s && s.toLowerCase().includes(ql))));
   const key = { appear: ([, c]) => epCount(c), lines: ([, c]) => c.lines, events: ([, c]) => c.events.length };
@@ -70,7 +85,7 @@ function renderList(activeName) {
   const shown = arr.slice(0, LIST_LIMIT);
   const metric = (c) => sort === 'lines' ? `${c.lines} 句` : sort === 'events' ? `${c.events.length} 事件` : `${epCount(c)} 集`;
   side.querySelector('.list').innerHTML = shown.map(([n, c]) => `
-    <a class="list-item${n === activeName ? ' active' : ''}" data-name="${esc(n)}" href="${href.char(n)}">
+    <a class="list-item${n === activeName ? ' active' : ''}" data-name="${esc(n)}" href="${href.char(n)}?${new URLSearchParams({ bian })}">
       <span class="n" style="color:var(--c-${c.kind})">●</span><span class="grow">${charLabel(n)}</span>
       <span class="n">${metric(c)}</span></a>`).join('')
     + (arr.length > LIST_LIMIT ? `<div class="muted small pad">共 ${arr.length} 人，只显示前 ${LIST_LIMIT} 个，请用搜索缩小范围。</div>` : '');
@@ -87,7 +102,7 @@ function renderProfile(name) {
   content.innerHTML = `${pageHead({
     en: c.appellation || KIND_EN[c.kind],
     title: charName(name),
-    sub: c.aliases.length ? `又名：${c.aliases.map(esc).join('、')}` : '',
+    sub: c.aliases.length ? `又名：${c.aliases.map((a) => esc(charName(a))).join('、')}` : '',
     tags: `${charMark(name)}<span class="chip chip-${c.kind}">${KIND_LABEL[c.kind]}</span>
       ${c.profession ? `<span class="chip chip-plain">${esc(c.profession)} ${stars}</span>` : ''}`,
     nums: [

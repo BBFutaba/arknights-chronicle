@@ -36,6 +36,7 @@ export function threadColor(tid) {
 }
 
 export function epLabel(ep) {
+  if (ep.id?.startsWith('ef_')) return ep.title || ep.code;
   const name = [ep.code, ep.title].filter(Boolean).join(' ');
   return ep.avg ? `${name}（${ep.avg}）` : name;
 }
@@ -66,11 +67,11 @@ export function powerChip(id, extra = '') {
   return `<a class="chip chip-${p.kind}" href="${href.power(id)}">${esc(p.name)}${extra}</a>`;
 }
 
-export function threadChip(tid, linkTo = 'timeline') {
+export function threadChip(tid, linkTo = 'timeline', label = null) {
   const t = D.threads[tid];
   if (!t) return '';
   const url = linkTo === 'timeline' ? href.timeline({ thread: tid }) : href.group(tid);
-  return `<a class="thread-chip" href="${url}" style="--c:${threadColor(tid)}">${esc(t.name)}</a>`;
+  return `<a class="thread-chip" href="${url}" style="--c:${threadColor(tid)}">${esc(label ?? t.name)}</a>`;
 }
 
 export function eventItem(ev) {

@@ -150,6 +150,16 @@ class BianTests(unittest.TestCase):
             a.load_benmo(probs)
             self.assertTrue(any("不适用" in p for p in probs), probs)
 
+    def test_talos_problem_locations_use_actual_filenames(self):
+        self.write("纪事本末-塔卫二.md", "@事 迁行\n@错 指令\n")
+        self.write("列传-塔卫二.md", "@传 不存在的人\n@错 指令\n")
+        probs = a.Problems()
+        a.load_benmo(probs, a.TALOS)
+        a.load_liezhuan(probs, a.TALOS)
+        self.assertTrue(any(p.startswith("纪事本末-塔卫二.md:2") for p in probs), probs)
+        self.assertTrue(any(p.startswith("列传-塔卫二.md:1") for p in probs), probs)
+        self.assertTrue(any(p.startswith("列传-塔卫二.md:2") for p in probs), probs)
+
     def test_index_evidence_cannot_cross_bian(self):
         probs = a.Problems()
         a.zhuan_index(probs, {"补:泰拉"}, {"终末地·佩丽卡"}, bian=a.TALOS)
@@ -169,14 +179,17 @@ globalThis.fetch = async (name) => {
   let data = JSON.parse(fs.readFileSync(path.join(root, 'site', name), 'utf8'));
   if (name === 'data/annals.json') {
     const fixture = JSON.parse(fs.readFileSync(path.join(sample, 'annals.json'), 'utf8'));
-    for (const key of ['volumes', 'benmo', 'liezhuan']) data[key].push(...fixture[key]);
+    for (const key of ['volumes', 'benmo', 'liezhuan']) {
+      data[key] = data[key].filter((v) => (v.bian ?? '泰拉编') === '泰拉编');
+      data[key].push(...fixture[key]);
+    }
   }
   return { ok: true, json: async () => data };
 };
 const moduleAt = (name) => import(pathToFileURL(path.join(root, 'site/js', name)).href);
 const { D, loadAll } = await moduleAt('data.js');
 await loadAll();
-const { href, charChip } = await moduleAt('util.js');
+const { href, charChip, epLabel } = await moduleAt('util.js');
 const { inline } = await moduleAt('annals.js');
 const talos = D.events.filter((e) => e.bian === '塔卫二编');
 assert.deepEqual(talos.map((e) => e.id), ['补:历前', '补:旧事', '补:失年', '补:春事', '补:岁事']);
@@ -190,16 +203,24 @@ assert(markup.includes(href.char('终末地·佩丽卡')));
 assert(markup.includes('game-mark'));
 assert(!markup.includes('>终末地·佩丽卡<'));
 assert(charChip('终末地·佩丽卡').includes('game-mark'));
+assert.equal(epLabel({ id: 'ef_dlg_fixture', code: '', title: '复苏 · 对话 1', avg: '剧情' }), '复苏 · 对话 1');
 // 最小 DOM 仅接收页面 HTML，验证索引筛选与直达详情；不代替浏览器视觉检查。
 class Element {
   constructor() { this.nodes = new Map(); this.innerHTML = ''; this.style = { setProperty() {} };
-    this.classList = { add() {}, remove() {}, toggle() {} }; this.childElementCount = 0; }
+    this.classes = new Set();
+    this.classList = { add: (k) => this.classes.add(k), remove: (k) => this.classes.delete(k),
+      toggle: (k, on) => on ? this.classes.add(k) : this.classes.delete(k) }; this.childElementCount = 0; }
   querySelector(s) { if (!this.nodes.has(s)) this.nodes.set(s, new Element()); return this.nodes.get(s); }
   querySelectorAll() { return []; }
   addEventListener() {}
   scrollIntoView() {}
 }
-globalThis.document = { activeElement: null, addEventListener() {}, removeEventListener() {} };
+const doc = new Element();
+globalThis.document = { activeElement: null, addEventListener() {}, removeEventListener() {},
+  querySelector: (s) => doc.querySelector(s),
+  createElement: () => ({ getContext: () => ({ measureText: () => ({ width: 100 }) }) }),
+};
+globalThis.Path2D = class {};
 globalThis.CSS = { escape: (s) => s };
 for (const route of ['benmo', 'zhuan']) {
   const mod = await moduleAt(route + '.js'), el = new Element();
@@ -208,6 +229,7 @@ for (const route of ['benmo', 'zhuan']) {
   assert(!el.querySelector('.content').innerHTML.includes('塔卫二编'));
   mod.update(r('塔卫二编'));
   const content = el.querySelector('.content').innerHTML;
+  assert(el.querySelector('.content').classes.has('bian-talos'));
   assert(content.includes('塔卫二编'));
   assert(content.includes(route === 'benmo' ? '迁行' : '佩丽卡传'));
   mod.update(r('塔卫二编', [route === 'benmo' ? '迁行' : '终末地·佩丽卡']));
@@ -227,16 +249,47 @@ assert(!rowIds().includes('补:春事'));
 timeline.unmount();
 const annals = await moduleAt('annals.js'), annalsEl = new Element();
 annals.mount(annalsEl, route(null, ['塔152']));
+assert(annalsEl.querySelector('.content').classes.has('bian-talos'));
 assert(annalsEl.querySelector('.content').innerHTML.includes('塔罗斯历一五二年'));
 assert(annalsEl.querySelector('.an-side').innerHTML.includes('塔卫二编'));
 annals.update(route(null, ['塔卫二前纪']));
 assert(annalsEl.querySelector('.content').innerHTML.includes('塔罗斯历以前'));
 annals.unmount();
+const chars = await moduleAt('chars.js'), charsEl = new Element();
+chars.mount(charsEl, route());
+const charList = () => charsEl.querySelector('.side').querySelector('.list').innerHTML;
+assert(charList().includes('阿米娅'));
+assert(!charList().includes('终末地·'));
+chars.update(route('塔卫二编'));
+assert(charList().includes('终末地·'));
+assert(!charList().includes('data-name="博士"'));
+chars.update(route(null, ['终末地·佩丽卡']));
+assert.equal(charsEl.querySelector('.side').querySelector('.ch-bian').value, '塔卫二编');
+chars.update(route('全部'));
+assert(charList().includes('data-name="博士"'));
+assert(charList().includes('game-mark'));
+chars.update(route());
+assert(!charList().includes('终末地·'));
+const graph = await moduleAt('graph.js');
+graph.update(route());
+assert([...graph.collect().nodes.keys()].some((id) => id.startsWith('char:')));
+assert(![...graph.collect().nodes.keys()].some((id) => id.startsWith('char:终末地·')));
+graph.update(route('塔卫二编'));
+assert([...graph.collect().nodes.keys()].some((id) => id.startsWith('char:终末地·')));
+assert([...graph.collect().nodes.keys()].filter((id) => id.startsWith('char:')).every((id) => id.startsWith('char:终末地·')));
+graph.update(route(null, ['char:终末地·佩丽卡']));
+assert.equal(doc.querySelector('.g-bian').value, '塔卫二编');
+assert(graph.collect().nodes.has('char:终末地·佩丽卡'));
+graph.update(route());
+assert(![...graph.collect().nodes.keys()].some((id) => id.startsWith('char:终末地·')));
+assert(!D.charAlias['终末地·峰']);
+assert.match(fs.readFileSync(path.join(root, 'site/style.css'), 'utf8'), /\.bian-talos \.game-mark\s*\{\s*display:\s*none/);
 D.annals.volumes = D.annals.volumes.filter((v) => v.bian === '泰拉编');
 annals.mount(annalsEl, route(null, ['1097']));
+assert(!annalsEl.querySelector('.content').classes.has('bian-talos'));
 assert(!annalsEl.querySelector('.an-side').innerHTML.includes('塔卫二编'));
 annals.unmount();
-console.log('Web smoke: timeline switch, volume routes, namespace links and bian shelves OK');
+console.log('Web smoke: timeline, volumes, character lists, graph, labels and bian shelves OK');
 """
         result = subprocess.run([shutil.which("node"), "--input-type=module",
                                  "-e", script, str(self.output)], cwd=ROOT, capture_output=True, text=True, encoding="utf-8")

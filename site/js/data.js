@@ -39,7 +39,12 @@ export async function loadAll() {
   }
   // 一人多名：剧本和编年史里写哪个名字，都指向同一个人物页
   D.charAlias = {};
-  for (const [name, c] of Object.entries(D.chars)) for (const a of c.aliases) D.charAlias[a] ??= name;
+  const ambiguous = new Set();
+  for (const [name, c] of Object.entries(D.chars)) for (const a of c.aliases) {
+    if (a.startsWith('终末地·') && D.charAlias[a] && D.charAlias[a] !== name) ambiguous.add(a);
+    D.charAlias[a] ??= name;
+  }
+  for (const a of ambiguous) delete D.charAlias[a];
   for (const [a, name] of Object.entries(D.annals?.aliases ?? {})) if (D.chars[name]) D.charAlias[a] ??= name;
   for (const b of D.annals?.benmo ?? []) {
     D.benmoByTitle[`${b.bian ?? BIANS[0]}:${b.title}`] = b;

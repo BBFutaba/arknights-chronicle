@@ -18,6 +18,7 @@ let visible = [];    // 当前筛选后的事件，用于上一条/下一条
 let selected = null;
 let lastFilterKey = null;
 const state = { bian: BIANS[0], q: '', cats: new Set(CAT_ORDER), parallel: true, cunmu: false, char: null, power: null, thread: null };
+const displayName = (s) => state.bian === BIANS[1] ? charName(s) : s;
 
 export function mount(el, r) {
   root = el;
@@ -194,7 +195,7 @@ function render() {
     const e = it.ev;
     const t = D.threads[e.thread];
     const g = D.groupById[e.thread];
-    const tag = e.thread === 'lore' ? '' : `<span class="tl-tag" style="--c:${threadColor(e.thread)}" title="${esc(t.name)}">${esc(g?.chapter != null ? g.label : t.name)}</span>`;
+    const tag = e.thread === 'lore' ? '' : `<span class="tl-tag" style="--c:${threadColor(e.thread)}" title="${esc(displayName(t.name))}">${esc(displayName(g?.chapter != null ? g.label : t.name))}</span>`;
     const more = e.lines.length > 1 ? `<span class="muted"> +${e.lines.length - 1}</span>` : '';
     const par = e.parallel ? '<span class="badge">平行</span>' : '';
     return `<div class="tl-row${e.id === selected ? ' sel' : ''}" data-ev="${e.id}" style="padding-left:${width + 8}px">
@@ -234,7 +235,7 @@ function renderSide(lanes) {
   };
   if (state.char) active.push(`<a class="filter-chip" href="${without('char')}">人物：${charLabel(state.char)} ×</a>`);
   if (state.power) active.push(`<a class="filter-chip" href="${without('power')}">地区/势力：${esc(D.powers[state.power]?.name ?? state.power)} ×</a>`);
-  if (state.thread) active.push(`<a class="filter-chip" href="${without('thread')}">故事线：${esc(D.threads[state.thread]?.name ?? state.thread)} ×</a>`);
+  if (state.thread) active.push(`<a class="filter-chip" href="${without('thread')}">故事线：${esc(displayName(D.threads[state.thread]?.name ?? state.thread))} ×</a>`);
   root.querySelector('.tl-active').innerHTML = active.join('');
   const total = D.events.filter((e) => (e.bian ?? BIANS[0]) === state.bian).length;
   root.querySelector('.tl-count').textContent = `显示 ${visible.length} / ${total} 条事件，最多 ${lanes - 1} 条故事线并行`;
@@ -251,7 +252,7 @@ function renderSide(lanes) {
 
   const title = state.char ? `人物：${charName(state.char)}`
     : state.power ? `地区与势力：${D.powers[state.power]?.name ?? state.power}`
-      : state.thread ? `故事线：${D.threads[state.thread]?.name ?? state.thread}` : '全部事件';
+      : state.thread ? `故事线：${displayName(D.threads[state.thread]?.name ?? state.thread)}` : '全部事件';
   root.querySelector('.tl-head').innerHTML = pageHead({
     en: state.char || state.power || state.thread ? 'FILTERED' : 'ALL EVENTS',
     title,
@@ -311,14 +312,14 @@ function renderDetail(ev) {
   const filters = [
     ...ev.chars.map((n) => `<a href="${href.timeline({ char: n })}">${esc(n)}</a>`),
     ...ev.powers.map((p) => `<a href="${href.timeline({ power: p })}">${esc(D.powers[p]?.name ?? p)}</a>`),
-    ev.thread !== 'lore' ? `<a href="${href.timeline({ thread: ev.thread })}">故事线「${esc(D.threads[ev.thread].name)}」</a>` : '',
+    ev.thread !== 'lore' ? `<a href="${href.timeline({ thread: ev.thread })}">故事线「${esc(displayName(D.threads[ev.thread].name))}」</a>` : '',
   ].filter(Boolean).join('');
 
   detail.innerHTML = `
     <div class="ev-nav">${nav(i - 1, '↑ 上一条')}${nav(i + 1, '下一条 ↓')}</div>
     <div class="ev-when">${esc(ev.when)}</div>
     <div class="muted small">${esc(ev.era)}</div>
-    <div class="ev-tags">${ev.thread === 'lore' ? '<span class="thread-chip" style="--c:var(--lore)">设定与档案</span>' : threadChip(ev.thread, 'group')}${ev.parallel ? '<span class="badge">平行世界</span>' : ''}</div>
+    <div class="ev-tags">${ev.thread === 'lore' ? '<span class="thread-chip" style="--c:var(--lore)">设定与档案</span>' : threadChip(ev.thread, 'group', displayName(D.threads[ev.thread].name))}${ev.parallel ? '<span class="badge">平行世界</span>' : ''}</div>
     <div class="ev-lines">${ev.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div>
     ${D.annalsByEvent[ev.id] ? `<div class="actions"><a class="btn" href="${href.annalsEntry(D.annalsByEvent[ev.id])}">编年史中的记述</a></div>` : ''}
     ${ev.notes.length ? `<div class="note">${ev.notes.map(esc).join('<br>')}</div>` : ''}

@@ -5,7 +5,18 @@
 「〔女〕…〔男〕…」，{player}/昵称占位符称「管理员」。entry 链接去标签留原词；
 image 标签转成「〔图片：资源键〕」或「〔表情：资源键〕」，不猜图片内容。
 未知占位符原样保留供检查。
-演员名外围的 {...} 是开发期人名标记，仅去外围括号，不推断真实身份。
+说话人来自 DialogTextTable/RadioTable.actorName，按其 id 解引用 CN 表；例如
+dlg_a1m6d5_5_019 的 actorNameId=yuxiuli，actorName 解得「老俞{俞秀丽}」。
+花括号是本地化文本中的开发标记：前半是场上称呼，后半可能是身份名、资源编号、
+演出阶段或群体说明，并非一律是真名。按以下顺序整理，只改 speaker，不增删剧本行：
+1. 后半含 ASCII 字母、数字、-、_：内部编号，保留前称，不从编号里猜人名。
+2. 群体（&/、等）或扮演标记：保留前称；后半与前称相同时直接去括号。
+3. 后半是泛称（含「的」、问号、声音/系统/年龄阶段等）：保留前称，存表备查。
+4. 前半是泛称（含「的」、问号、无线电/录音/职业等），后半是姓名：取后名。
+5. 两边均为姓名式称呼：取后面的全名，前称记为此人的别名；同一别名若指向多个
+   正名则不全局归并（如「峰」的两种原文异写），避免无据合并。
+完整映射、导出剧本中的命中行数和规则写到 site/data/endfield-speakers.tsv；
+「？？？{亨德森}」等揭名据内部标记，编者应查表，不能视为场上已公开身份。
 选项用 decision，条件/跳转用 branch；并列分支全部展示，回边只显示跳转不展开。
 时间轴保留选项 logicId/optionIndex，但尚未还原所有跳转：时间序表示候选轨道全集，
 不声称是一条玩家会连续经历的实机路径；不能据此认定互斥台词同时发生。
@@ -13,12 +24,14 @@ DialogTree 按 connections 遍历；Timeline 按 startTime；无线电按 index�
 SNS 按 nextContentId/optionNextContentId。跨场景顺序不能从编号假定为实际触发顺序，
 此时每个场景独立成集，目录仅按自然编号，audit 中注明。ID 使用原始资源键，
 不使用中文标题或遍历序号，因而改名/插入资源不会重命名旧分集。
+分集显示名用任务名＋媒介＋任务内目录序号；无任务时按所在组编号。编号沿用
+原目录顺序，不能据此认定跨媒介的实机触发先后；资源键只作 id，不重复作 code。
 
-所有人物页键均为「终末地·原名」，不套用明日方舟别名/势力/博士规则。
-原始说话人仍用于剧本正文；出场键与人物页键单独处理。
+所有人物页键均为「终末地·整理后的名字」，不套用明日方舟别名/势力/博士规则。
+剧本和出场使用整理后的说话人；审计表保留原写法，别名仅在终末地命名空间内使用。
 """
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import csv
 import html
 import json
@@ -30,6 +43,47 @@ from .entities import Character
 from .script import Line, Script
 
 PREFIX = "终末地·"
+
+
+def generic_speaker(name):
+    """描述/媒介/职业称呼；不据长度猜姓名。未识别的非编号称呼按姓名式处理。"""
+    return (not name or bool(re.search(r"[的？?]|^(?:婴儿|少年老|成年老|老年老|变声器)", name))
+            or name in {"少年", "老人", "护士", "巡卫", "天师", "行商", "女记者", "基地警卫",
+                        "客栈帮工", "卖花少女", "红发少女", "年轻天师", "鲁珀青年", "裂地者",
+                        "无线电", "无线电通信", "录音", "留声带", "喇叭广播", "播报音", "系统语音",
+                        "异口同声", "武陵众人", "影子"}
+            or name.endswith(("声音", "呢喃", "系统", "语音播报器", "蚀影")))
+
+
+def speaker_name(raw):
+    """返回（规范名，姓名式别称或空串，审计规则）；不改变任何台词或行类型。"""
+    raw = raw.strip("{}")
+    if "{" not in raw:
+        return raw, "", "原称"
+    front, back = (s.strip() for s in raw.split("{", 1))
+    back = back.rstrip("}")
+    if re.search(r"[A-Za-z0-9_-]", back):
+        return front, "", "内部编号：取前称"
+    if re.search(r"[&＆、，,]", front + back) or "饰" in back:
+        return front, "", "群体或扮演：取前称"
+    if front == back:
+        return front, "", "同名：去标记"
+    if generic_speaker(back):
+        return front, "", "后为泛称：取前称"
+    if generic_speaker(front):
+        return back, "", "前为泛称：取后名（内部身份）"
+    return back, front, "两侧姓名：取后名，前称为别名"
+
+
+def write_speakers(episodes, path):
+    counts = Counter()
+    for ep in episodes:
+        counts.update(getattr(ep, "speaker_audit", {}))
+    with path.open("w", encoding="utf-8", newline="") as f:
+        out = csv.writer(f, delimiter="\t", lineterminator="\n")
+        out.writerow(["原写法", "改后说话人", "行数", "依据规则"])
+        for (raw, name, rule), count in sorted(counts.items()):
+            out.writerow([PREFIX + raw, PREFIX + name if name else "", count, rule])
 
 
 def natural(value):
@@ -161,7 +215,7 @@ class Loader:
         if sid in self.episode_ids:
             raise ValueError(f"duplicate Endfield episode: {sid}")
         self.episode_ids.add(sid)
-        group.episodes.append(Episode(sid, group.id, key, title, avg,
+        group.episodes.append(Episode(sid, group.id, "", title, avg,
                                       len(group.episodes), "", None, Script(lines),
                                       synopsis, source, note))
         if note:
@@ -545,12 +599,44 @@ class Loader:
                             if rest == m or rest.startswith(m + "_")), "")
                 return self.mission_rank.get(mid, 9999), natural(mid), natural(key)
             group.episodes.sort(key=order)
+            numbers = Counter()
             for index, ep in enumerate(group.episodes):
                 ep.sort = index
+                if ep.avg in ("剧情", "无线电", "讯息"):
+                    _, mid = self.group_for(ep.story_id.removeprefix("ef_"))
+                    title = self.text(self.missions.get(mid, {}).get("missionName")) or group.name.removeprefix(PREFIX)
+                    kind = "对话" if ep.avg == "剧情" else ep.avg
+                    numbers[mid] += 1
+                    ep.title = f"{title} · {kind} {numbers[mid]}"
+                elif ep.avg == "字幕":
+                    ep.title = f"{group.name.removeprefix(PREFIX)} · 字幕 {index + 1}"
+        # 只将无歧义的姓名式别称用于独立出现的旧称；不归并两个资源中的异写。
+        aliases = defaultdict(set)
+        for group in self.groups.values():
+            for ep in group.episodes:
+                for line in ep.script.lines:
+                    name, alias, _ = speaker_name(line.speaker or "")
+                    if alias:
+                        aliases[alias].add(name)
+        for group in self.groups.values():
+            for ep in group.episodes:
+                ep.speaker_aliases = {a: next(iter(ns)) for a, ns in aliases.items() if len(ns) == 1}
         return {k: g for k, g in self.groups.items() if g.episodes}
 
 
 def analyze_episode(ep, reg):
+    ep.speaker_audit = Counter()
+    aliases = getattr(ep, "speaker_aliases", {})
+    normalized = []
+    for line in ep.script.lines:
+        raw = line.speaker or ""
+        name, alias, rule = speaker_name(raw)
+        name = aliases.get(name, name)
+        if "{" in raw.strip("{}"):
+            ep.speaker_audit[raw.strip("{}"), name, rule] += 1
+        normalized.append(replace(line, speaker=name or line.speaker))
+    # Timeline 缓存的 Line 可被多集共享：复制，避免改写其他分集的源名和审计计数。
+    ep.script = replace(ep.script, lines=normalized)
     d = EpisodeData(ep, ep.synopsis, ep.script)
     for line in ep.script.lines:
         raw = "管理员" if line.kind == "decision" else line.speaker if line.kind == "dialogue" else None
@@ -560,6 +646,14 @@ def analyze_episode(ep, reg):
         if name not in reg.chars:
             reg.chars[name] = Character(name, "npc")
             reg.chars[name].game = "endfield"
+        for alias, target in aliases.items():
+            if target == raw and PREFIX + alias not in reg.chars[name].aliases:
+                reg.chars[name].aliases.append(PREFIX + alias)
+        # 单独 analyze_episode 的测试/调用也保留当前行的别名。
+        for original in ep.speaker_audit:
+            target, alias, _ = speaker_name(original[0])
+            if alias and target == raw and PREFIX + alias not in reg.chars[name].aliases:
+                reg.chars[name].aliases.append(PREFIX + alias)
         d.lines[name] += 1
     d.present.update(d.lines)
     return d

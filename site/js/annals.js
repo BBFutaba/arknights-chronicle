@@ -63,6 +63,7 @@ const countGang = (s) => s.days.reduce((n, d) => n + d.entries.reduce((m, e) => 
 // ---------------------------------------------------------------- 正文
 
 function renderVolume(v) {
+  content.classList.toggle('bian-talos', v.bian === '塔卫二编');
   const key = `vol:${v.year}`;
   if (shown === key) return;
   shown = key;

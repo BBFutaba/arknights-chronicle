@@ -34,7 +34,7 @@ function items() {
     const item = {
       key: z.name, bian: z.bian, z, ix, name: `${charName(z.name)}传`, url: href.zhuan(z.name, z.bian), n: z.entries.length,
       line: plainFirst(z.summary),
-      tags: [z.bian === '塔卫二编' ? '终末地' : '', origin, ix.race, ...ix.factions, ix.fate ? fateTag(ix) : '', `${z.entries.length} 条`].filter(Boolean),
+      tags: [origin, ix.race, ...ix.factions, ix.fate ? fateTag(ix) : '', `${z.entries.length} 条`].filter(Boolean),
       text: [z.name, ...(c?.aliases ?? []), ...(aliasesOf[z.name] ?? []), ...z.summary, origin, ix.race, ...ix.factions, ix.note].join(' ').toLowerCase(),
       facets: {
         出身: [ix.origin], 身后: ix.fate ? [ix.fate] : [], 族裔: ix.race ? [ix.race] : [], 所属: ix.factions,

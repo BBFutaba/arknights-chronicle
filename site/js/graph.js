@@ -2,7 +2,7 @@
 // 用 force-graph 跑持续的力导向模拟：拖动节点时相连的节点会被连线拉着走，松手后整张图重新找平衡；
 // 改筛选时已有节点留在原处，新节点从相连的节点旁边出现。人物之间的连线是共同出场的集数，
 // 集数越多，连线越粗、拉得越近。从人物或地区页点「在关系图中查看」会进入以它为中心的模式。
-import { D } from './data.js';
+import { D, BIANS } from './data.js';
 import { esc, href, charName, KIND_LABEL } from './util.js';
 
 const TOP_PARTNERS = 6;   // 总览模式下每人保留的同场连线数
@@ -17,14 +17,15 @@ const SLIDERS = [
   ['distance', '连线距离', 20, 200, 5],
 ];
 
-let fg = null, info, box, ro = null, focus = null;
+let fg = null, info, box, ro = null, focus = null, bian = BIANS[0];
 let cache = new Map();   // 节点 id → 节点对象；跨次构建保留，位置不丢
 let adj = new Map();     // 节点 id → 相邻节点 id 的集合
 let hover = null, selected = null, lastClick = { id: null, t: 0 };
 let palette = {}, fadeTimer = null, fitTimer = null, fitPending = false;
 
 const epCount = (c) => c.appear.reduce((n, [, sids]) => n + sids.length, 0);
-const personLabel = (name) => `${charName(name)}${name.startsWith('终末地·') ? '〔终末地〕' : ''}`;
+// 关系图一次只画一编，不用再标「终末地」
+const personLabel = (name) => charName(name);
 // 颜色从关系图自己的平面上读：纸面和内容平面是两组值
 const css = (v) => getComputedStyle(document.querySelector('.graph-main') ?? document.documentElement).getPropertyValue(v).trim();
 const nid = (x) => (typeof x === 'object' ? x.id : x);
@@ -33,6 +34,7 @@ const clamp = (x) => Math.max(0, Math.min(1, x));
 export function mount(el, r) {
   el.innerHTML = `
     <aside class="side panel graph-side">
+      <label>编 <select class="g-bian">${BIANS.map((b) => `<option>${esc(b)}</option>`).join('')}</select></label>
       <div class="graph-mode"></div>
       <div class="range-row g-min-row">出场 ≥ <input type="range" class="g-min" min="3" max="120" step="1"><b class="g-min-v"></b> 集</div>
       <label class="toggle"><input type="checkbox" class="g-powers">地区与势力</label>
@@ -56,6 +58,9 @@ export function mount(el, r) {
     <section class="graph-main panel"><div id="fg"></div><div class="graph-info panel" hidden></div></section>`;
   info = el.querySelector('.graph-info');
   box = el.querySelector('#fg');
+  el.querySelector('.g-bian').addEventListener('change', (e) => {
+    location.hash = `#/graph?${new URLSearchParams({ bian: e.target.value })}`;
+  });
   const min = el.querySelector('.g-min');
   min.value = opts.minEp;
   el.querySelector('.g-min-v').textContent = opts.minEp;
@@ -90,10 +95,15 @@ export function unmount() {
 
 export function update(r) {
   const next = r.parts[0] ?? null;
-  const changed = next !== focus;
+  const requested = r.params.get('bian');
+  const inferred = next?.startsWith('char:终末地·') ? BIANS[1] : BIANS[0];
+  const nextBian = next?.startsWith('char:') ? inferred : BIANS.includes(requested) ? requested : inferred;
+  const changed = next !== focus || bian !== nextBian;
+  bian = nextBian;
+  document.querySelector('.g-bian').value = bian;
   focus = next;
   document.querySelector('.graph-mode').innerHTML = focus
-    ? `<div>以 <b>${esc(label(focus))}</b> 为中心</div><a class="btn" href="#/graph">返回总览</a>`
+    ? `<div>以 <b>${esc(label(focus))}</b> 为中心</div><a class="btn" href="#/graph?${new URLSearchParams({ bian })}">返回总览</a>`
     : '<div class="muted small">总览：出场较多的人物及其所属</div>';
   document.querySelector('.g-min-row').hidden = !!focus;
   if (changed) cache = new Map();  // 换了中心就重新展开，不沿用上一张图的位置
@@ -108,11 +118,11 @@ function splitId(id) { const i = id.indexOf(':'); return [id.slice(0, i), id.sli
 
 // ---------------------------------------------------------------- 图数据
 
-function collect() {
+export function collect() {
   const nodes = new Map(), links = new Map();
-  const addChar = (n) => {
+  const addChar = (n, isFocus = false) => {
     const c = D.chars[n];
-    if (!c || (c.kind === 'doctor' && !opts.doctor)) return;
+    if (!c || n.startsWith('终末地·') !== (bian === BIANS[1]) || (c.kind === 'doctor' && !opts.doctor && !isFocus)) return;
     nodes.set(`char:${n}`, { id: `char:${n}`, label: personLabel(n), type: c.kind, size: epCount(c) });
   };
   const addPower = (p) => {
@@ -120,6 +130,7 @@ function collect() {
   };
   const addEvent = (id) => {
     const e = D.eventById[id];
+    if (!e || (e.bian ?? BIANS[0]) !== bian) return;
     nodes.set(`event:${id}`, { id: `event:${id}`, label: e.lines[0].slice(0, 14) + (e.lines[0].length > 14 ? '…' : ''), type: 'event', size: 6 });
   };
   const link = (a, b, w, kind) => {
@@ -132,14 +143,14 @@ function collect() {
     const [type, key] = splitId(focus);
     if (type === 'char' && D.chars[key]) {
       const c = D.chars[key];
-      nodes.set(focus, { id: focus, label: personLabel(key), type: c.kind, size: epCount(c) });
+      addChar(key, true);
       c.co.forEach(([n]) => addChar(n));
       if (opts.powers) c.powers.forEach(addPower);
       if (opts.events) c.events.forEach(addEvent);
     } else if (type === 'power' && D.powers[key]) {
       const p = D.powers[key];
       addPower(key);
-      p.members.slice(0, 40).forEach(addChar);
+      p.members.slice(0, 40).forEach((n) => addChar(n));
       [p.parent, ...p.children].filter(Boolean).forEach(addPower);
       if (opts.events) p.events.forEach(addEvent);
     }
@@ -514,7 +525,7 @@ function rgba(hex, a) {
 function onClick(n) {
   const now = performance.now();
   if (lastClick.id === n.id && now - lastClick.t < 350) {
-    location.hash = `#/graph/${n.id}`;
+    location.hash = `#/graph/${n.id}?${new URLSearchParams({ bian })}`;
     return;
   }
   lastClick = { id: n.id, t: now };

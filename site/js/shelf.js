@@ -155,6 +155,7 @@ export function makeShelf(cfg) {
     const item = !key ? null : asked ? cfg.resolve(key, asked)
       : cfg.resolve(key, guess) ?? BIANS.map((b) => cfg.resolve(key, b)).find(Boolean);
     if (item) {
+      content.classList.toggle('bian-talos', item.bian === BIANS[1]);
       // 看单篇时，左栏保留进来时的筛选
       if ([...r.params.keys()].some((k) => k !== 'e')) readState(r.params);
       if (state.bian !== (item.bian ?? BIANS[0])) {
@@ -172,6 +173,7 @@ export function makeShelf(cfg) {
       return;
     }
     readState(r.params);
+    content.classList.toggle('bian-talos', state.bian === BIANS[1]);
     syncControls();
     renderFacets();
     renderList(null);
