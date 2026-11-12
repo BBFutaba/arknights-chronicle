@@ -77,7 +77,7 @@ class EndfieldTests(unittest.TestCase):
                             ("radio_e0m2_9", "无线电"), ("sns_e0m2_4", "讯息")]:
             loader.add(group, key, key, [Line("narration", key)], avg=medium)
         ids = {ep.story_id for ep in group.episodes}
-        for method in ("setup_groups", "load_dialogs", "load_radio", "load_sns", "load_narrative", "load_subtitles"):
+        for method in ("setup_groups", "load_dialogs", "load_radio", "load_sns", "load_narrative", "load_subtitles", "load_lore"):
             setattr(loader, method, lambda: None)
         with patch("builtins.print"):
             loader.load()

@@ -10,7 +10,7 @@ import argparse
 import json
 import sys
 
-from . import chronicle, config, endfield, gamedata
+from . import chronicle, config, endfield, gamedata, lore
 from .analyze import analyze_episode, to_record
 from .entities import Registry
 from .site import SiteExporter
@@ -35,6 +35,7 @@ def main():
     groups = gamedata.load_groups()
     ef_groups, ef_audit, ef_operators = endfield.load()
     groups.update(ef_groups)
+    groups.update(lore.load())  # 泰拉编的设定文本（模组故事、图鉴、语音等），见 pipeline/lore.py
     if args.list:
         for g in sorted(groups.values(), key=gamedata.sort_key):
             print(f"{g.id:16s} {g.category}  {g.label:8s} {g.name}（{len(g.episodes)} 集）")
@@ -42,7 +43,8 @@ def main():
 
     reg = Registry()
     endfield.register_operators(reg, ef_operators)
-    built = {gid: [(endfield.analyze_episode if gid.startswith("ef_") else analyze_episode)(e, reg)
+    built = {gid: [(endfield.analyze_episode if gid.startswith("ef_")
+                    else lore.analyze_episode if gid.startswith("lore_") else analyze_episode)(e, reg)
                    for e in g.episodes] for gid, g in groups.items()}
     endfield.add_book_aliases(reg)
     endfield.register_powers(reg)

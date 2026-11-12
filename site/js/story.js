@@ -2,7 +2,10 @@
 import { D, loadStory } from './data.js';
 import { esc, href, epLabel, groupLabel, charLabel, charChip, charOf, powerChip, eventItem, threadColor, pageHead } from './util.js';
 
-const CAT_EN = { 主线: 'MAIN STORY', 活动: 'EVENT', 故事集: 'COLLECTION', 干员密录: 'OPERATOR RECORD', 集成战略: 'INTEGRATED STRATEGIES', 生息演算: 'RECLAMATION ALGORITHM', 其他文本: 'OTHER TEXT' };
+const CAT_EN = { 主线: 'MAIN STORY', 活动: 'EVENT', 故事集: 'COLLECTION', 干员密录: 'OPERATOR RECORD', 集成战略: 'INTEGRATED STRATEGIES', 生息演算: 'RECLAMATION ALGORITHM', 其他文本: 'OTHER TEXT', 设定文本: 'LORE TEXT' };
+// 左栏的类别。「终末地」一项列出终末地的全部剧情组（它们的类别都以「终末地·」开头）
+const CATS = ['主线', '活动', '故事集', '干员密录', '集成战略', '生息演算', '其他文本', '设定文本', '终末地'];
+const inCat = (g, c) => (c === '终末地' ? g.category.startsWith('终末地·') : g.category === c);
 
 let root, side, content, cat = '主线', filter = '', renderToken = 0;
 
@@ -10,7 +13,7 @@ export function mount(el, r) {
   root = el;
   el.innerHTML = `
     <aside class="side panel">
-      <div class="seg-ctrl">${['主线', '活动', '故事集', '干员密录', '集成战略', '生息演算', '其他文本'].map((c) => `<button data-cat="${c}">${c}</button>`).join('')}</div>
+      <div class="seg-ctrl">${CATS.map((c) => `<button data-cat="${c}">${c}</button>`).join('')}</div>
       <input type="search" class="st-q" placeholder="筛选剧情组…">
       <div class="list"></div>
     </aside>
@@ -29,7 +32,7 @@ export function mount(el, r) {
 export function update(r) {
   const [gid, sid] = r.parts;
   const g = D.groupById[gid] ?? D.groups[0];
-  cat = g.category;
+  cat = g.category.startsWith('终末地·') ? '终末地' : g.category;
   renderList(g.id);
   if (sid && D.epById[sid]) renderEpisode(sid, parseLines(r.params.get('l')));
   else renderGroup(g);
@@ -39,7 +42,7 @@ export function update(r) {
 function renderList(activeId) {
   activeId ??= side.querySelector('.list-item.active')?.dataset.gid;
   side.querySelectorAll('.seg-ctrl button').forEach((b) => b.classList.toggle('active', b.dataset.cat === cat));
-  const gs = D.groups.filter((g) => (filter ? g.name.includes(filter) : g.category === cat));
+  const gs = D.groups.filter((g) => (filter ? g.name.includes(filter) : inCat(g, cat)));
   side.querySelector('.list').innerHTML = gs.map((g) => `
     <a class="list-item${g.id === activeId ? ' active' : ''}" data-gid="${g.id}" href="${href.group(g.id)}">
       <span class="n" style="color:${threadColor(g.id)}">●</span>
@@ -73,8 +76,8 @@ function renderGroup(g) {
       <a class="btn" href="${href.ep(g.episodes[0].id)}">从第一集开始读</a>
       ${evs.length ? `<a class="btn" href="${href.timeline({ thread: g.id })}">在时间轴中查看（${evs.length} 条事件）</a>` : ''}
     </div>
-    <h4>出场人物（按台词数）</h4>
-    <div class="chips">${chars.slice(0, 40).map(([n, l]) => charChip(n, `<span class="n">${l}</span>`)).join('')}</div>
+    ${chars.length ? `<h4>出场人物（按台词数）</h4>
+    <div class="chips">${chars.slice(0, 40).map(([n, l]) => charChip(n, `<span class="n">${l}</span>`)).join('')}</div>` : ''}
     ${Object.keys(powers).length ? `<h4>提及的地区与势力</h4><div class="chips">${Object.entries(powers).sort((a, b) => b[1] - a[1]).map(([p, c]) => powerChip(p, `<span class="n">${c}</span>`)).join('')}</div>` : ''}
     <h4>分集</h4>
     <div class="ep-list">${g.episodes.map((e) => `

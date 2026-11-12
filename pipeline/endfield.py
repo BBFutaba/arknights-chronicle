@@ -50,6 +50,7 @@ from .entities import Character, Power
 from .script import Line, Script
 
 PREFIX = "终末地·"
+LORE = "图鉴与文案"  # 2026-11-12 盘点后补接的图鉴、文案，见 Loader.load_lore
 
 
 def generic_speaker(name):
@@ -609,7 +610,8 @@ class Loader:
                 self.add(g, "terminal_" + r["uniqId"], self.text(r.get("name")), rich_lines(cid),
                          source="TableCfg/RichContentTable.json/" + cid, avg="文献")
                 used.add(cid)
-        self.audit["excluded"].append({"kind": "未被 PRTS/终端引用的 RichContent", "ids": sorted(set(rich) - used), "reason": "含玩法说明/测试或来源不明内容，待逐项判定"})
+        self.rich_used = used  # 剩下的在 load_lore 里另成一组「未入终端的文献」
+        self.audit["excluded"].append({"kind": "未被 PRTS/终端引用的 RichContent", "ids": sorted(set(rich) - used), "reason": "另成「图鉴与文案 · 未入终端的文献」，含玩法说明/测试或来源不明内容，未逐项判定"})
         self.load_operators()
         for cid, row in self.table("CharacterTable").items():
             name = self.text(row.get("name")) or cid
@@ -642,6 +644,113 @@ class Loader:
                          source="TableCfg/ItemTable.json/" + key + "/decoDesc", avg="物品")
         self.audit["excluded"].append({"kind": "ItemTable.desc", "reason": "功能说明和叙事混合；本轮只接独立 decoDesc 和武器故事"})
 
+    def lore_page(self, gid, name, records, page, source):
+        """records 是（名称，正文几行）；按原顺序每 page 条一集，一条是「【名称】」一行加正文。"""
+        g = self.group(gid, name, LORE)
+        records = [(t, body) for t, body in records if body]
+        for i in range(0, len(records), page):
+            chunk = records[i:i + page]
+            lines = []
+            for title, body in chunk:
+                if page > 1:
+                    lines.append(Line("narration", f"【{title}】"))
+                lines += [x if isinstance(x, Line) else Line("narration", x) for x in body]
+            title = chunk[0][0] if len(chunk) == 1 else f"{chunk[0][0]} … {chunk[-1][0]}"
+            self.add(g, f"{gid}_{i // page + 1:03d}", title, lines, source=source, avg="文本")
+
+    def load_lore(self):
+        """项目原先没读的图鉴和文案（2026-11-12 盘点）：敌人图鉴、未入终端的文献、调查物件、远程通讯、场景短对白、
+        闲谈、邮件、干员兴趣专长、驿站委托、拍照挑战的故事、说明书、百科条目、地图标记、玩法说明、加载提示、活动简介。
+        只归档成可读、可搜、可引的分集，不判断叙事价值；技能数值、教程、成就条件等纯玩法文本不收。
+        除远程通讯外都作旁白，不记说话人（免得撑大出场集数）。"""
+        t = self.text
+        chars = {cid: t(r.get("name")) for cid, r in self.table("CharacterTable").items()}
+        abilities = self.table("EnemyAbilityDescTable")
+        rows = []
+        for key, r in sorted(self.table("EnemyTemplateDisplayInfoTable").items(), key=lambda x: natural(x[0])):
+            nick = t(r.get("nickname"))
+            nick = nick if nick and nick != t(r.get("name")) else ""
+            body = [s for s in (nick and "别称：" + nick, t(r.get("description"), breaks=True)) if s]
+            body += ["能力：" + t(abilities[a].get("description")) for a in r.get("abilityDescIds", [])
+                     if a in abilities and t(abilities[a].get("description"))]
+            rows.append((t(r.get("name")) or key, body))
+        self.lore_page("lore_enemies", "敌人图鉴", rows, 20, "TableCfg/EnemyTemplateDisplayInfoTable.json")
+
+        rich = self.table("RichContentTable")
+        rows = [(t(rich[cid].get("title")) or cid, [t(c["content"]) for c in rich[cid].get("contentList", []) if t(c["content"])])
+                for cid in sorted(set(rich) - getattr(self, "rich_used", set()), key=natural)]
+        self.lore_page("lore_documents", "未入终端的文献", rows, 1, "TableCfg/RichContentTable.json")
+
+        self.lore_page("lore_inspect", "调查物件", [
+            (t(r.get("dialog2dTitle")) or k, [t(r.get("dialog2dText"), breaks=True)])
+            for k, r in sorted(self.table("Dialog2DTextTable").items(), key=lambda x: natural(x[0]))], 1,
+            "TableCfg/Dialog2DTextTable.json")
+
+        rows = []
+        for k, r in sorted(self.table("RemoteCommonTable").items(), key=lambda x: natural(x[0])):
+            body = []
+            for part in sorted(r.get("remoteCommSingleDataList", []), key=lambda x: x.get("index", 0)):
+                text, who = t(part.get("remoteCommText")), t(part.get("actorName")).strip("{}")
+                if text:
+                    body.append(Line("dialogue" if who else "narration", text, who or None))
+            rows.append((k, body))
+        self.lore_page("lore_remote", "远程通讯", rows, 1, "TableCfg/RemoteCommonTable.json")
+
+        rows = []
+        for k, r in sorted(self.table("EnvTalkTable").items(), key=lambda x: natural(x[0])):
+            body = []
+            for part in sorted(r.get("envTalkDataList", []), key=lambda x: x.get("index", 0)):
+                text = t(part.get("text"))
+                who = chars.get(part.get("actorId", ""), "")
+                if text:
+                    body.append(f"{who}：{text}" if who else text)
+            rows.append((k, body))
+        self.lore_page("lore_envtalk", "场景短对白", rows, 60, "TableCfg/EnvTalkTable.json")
+
+        self.lore_page("lore_bark", "闲谈", [(k, [t(r.get("barkText"))]) for k, r in self.table("AIBarkText").items()],
+                       100, "TableCfg/AIBarkText.json")
+        self.lore_page("lore_mail", "邮件", [
+            (t(r.get("title")) or k, [t(r.get("mailContent"), breaks=True)])
+            for k, r in sorted(self.table("MailTemplateTable").items(), key=lambda x: natural(x[0])) if "test" not in k], 1,
+            "TableCfg/MailTemplateTable.json")
+        self.lore_page("lore_tags", "干员兴趣与专长", [
+            (chars.get(k, k), [t(v.get("desc")) for v in r.get("tagDesc", {}).values() if t(v.get("desc"))])
+            for k, r in sorted(self.table("CharacterTagDesTable").items(), key=lambda x: natural(x[0]))], 40,
+            "TableCfg/CharacterTagDesTable.json")
+        rows = []
+        for k, r in sorted(self.table("KiteStationEntrustTasksTable").items()):
+            for part in sorted(r.get("list", {}).values(), key=lambda x: x.get("entrustIdx", 0)):
+                rows.append((t(part.get("name")) or k, [s for s in (t(part.get("desc")), t(part.get("completeDesc"))) if s]))
+        self.lore_page("lore_kite", "驿站委托", rows, 40, "TableCfg/KiteStationEntrustTasksTable.json")
+        self.lore_page("lore_snapshot", "拍照挑战的故事", [
+            (k, [s for s in (t(r.get("normalStoryDesc"), breaks=True), t(r.get("completeStoryDesc"), breaks=True)) if s])
+            for k, r in sorted(self.table("ActivitySnapshotChallengeTable").items(), key=lambda x: natural(x[0]))], 24,
+            "TableCfg/ActivitySnapshotChallengeTable.json")
+        self.lore_page("lore_instructions", "说明书", [
+            (t(r.get("title")) or k, [t(r.get("content"), breaks=True)])
+            for k, r in sorted(self.table("InstructionBook").items(), key=lambda x: natural(x[0]))], 20,
+            "TableCfg/InstructionBook.json")
+        self.lore_page("lore_wiki", "百科条目说明", [
+            (k.removeprefix("wiki_"), [t(r.get("desc"), breaks=True)])
+            for k, r in sorted(self.table("WikiEntryDataTable").items(), key=lambda x: natural(x[0]))], 60,
+            "TableCfg/WikiEntryDataTable.json")
+        self.lore_page("lore_mapmarks", "地图标记", [
+            (t(r.get("name")) or k, [t(r.get("desc"))])
+            for k, r in sorted(self.table("MapMarkTempTable").items(), key=lambda x: natural(x[0]))], 60,
+            "TableCfg/MapMarkTempTable.json")
+        self.lore_page("lore_mechanics", "玩法与挑战说明", [
+            (t(r.get("gameName")) or k, [t(r.get("desc"), breaks=True)])
+            for k, r in sorted(self.table("GameMechanicTable").items(), key=lambda x: natural(x[0]))], 80,
+            "TableCfg/GameMechanicTable.json")
+        self.lore_page("lore_tips", "加载提示", [
+            (t(r.get("tipsTitle")) or k, [t(r.get("text"))])
+            for k, r in sorted(self.table("LoadingTipsTable").items(), key=lambda x: natural(x[0]))], 60,
+            "TableCfg/LoadingTipsTable.json")
+        self.lore_page("lore_activities", "活动简介", [
+            (t(r.get("name")) or k, [s for s in (t(r.get("desc"), breaks=True), t(r.get("tips"), breaks=True)) if s])
+            for k, r in sorted(self.table("ActivityTable").items(), key=lambda x: natural(x[0]))], 30,
+            "TableCfg/ActivityTable.json")
+
     def load_subtitles(self):
         """字幕和未定位的黑屏文本独立成集，不拼到任务中猜测播放位置。"""
         scenes = defaultdict(list)
@@ -672,6 +781,7 @@ class Loader:
         self.load_sns()
         self.load_narrative()
         self.load_subtitles()
+        self.load_lore()
         # 未被对话树使用的台词不硬塞到看似连续的任务正文。
         self.audit["excluded"].extend([
             {"kind": "未达或未解析对话", "ids": sorted(set(self.dialogs) - self.used_dialogs)},

@@ -11,25 +11,34 @@
     STEP_SPARSE；换卷 STEP_VOLUME），再加上两处「距今年数取对数」之差乘 LOG_WEIGHT
     （距今：泰拉编算到一一〇三年末，塔卫二编算到一五二年末）。
     事多的年份按条目数拉长，空旷的年代按对数压缩，相隔很久的两件事之间还看得出一段空。
-  - 没有年份的放在标明的区段里，不参与对数：外纪开头年代不详的远古、泰拉编末尾的「不系年」、
+  - 「不系年」卷（原文与年表都无年份的剧情）不上立体轴：它在泰拉编末尾，后面紧接塔罗斯历，放上去像是
+    泰拉历走到头接上了塔罗斯历。这些条目在编年史和平面时间轴里照旧。
+  - 没有年份的放在标明的区段里，不参与对数：外纪开头年代不详的远古、
     塔卫二编的「塔罗斯历以前」和「年份不书」（各在书中的位置）。
 
-管理员苏醒：塔卫二编以管理员在帝江号上苏醒为界（书中「管理员苏醒于帝江号」一条，塔罗斯历一五二年春）。
-这一条自成一层，轴上画一圈绿环；塔卫二编每条都标出在苏醒之前还是之后：书中排在它前面的是之前
-（前纪、年份不明的区段、一五二年里苏醒前数周的事），后面的是之后；之前的按书中年份算出「苏醒前 N 年」。
-一五二年是本编推定的「当下」，所以年数随之而定，原文说的「沉睡十年」正对上一四二年的极点远征。
+两个起点（AWAKENINGS）：泰拉编的博士苏醒（ev0501，一〇九六年十二月二十三日，罗德岛从石棺中救出博士，主线由此
+开始）和塔卫二编的管理员苏醒（「管理员苏醒于帝江号」，塔罗斯历一五二年春）。这一条自成一层，网页在那里画一个
+圆形截面，字写在截面上。同一编的每条都标出在苏醒之前还是之后：书中排在它前面的是之前，后面的是之后，按书中
+年份算出「苏醒前 N 年」「苏醒后 N 年」。塔卫二编的一五二年是本编推定的「当下」，所以年数随之而定，原文说的
+「沉睡十年」正对上一四二年的极点远征。
 
 两种历法：书里塔罗斯历不与泰拉历换算，原文也没有给出对应（见 data/annals/丛目/终末地-纪年线索.md）。
 所以塔卫二编画在泰拉编后面，中间断开、不按比例，并在塔罗斯历元年处标明「对应泰拉历：原文未载」。
 将来官方给出对应年份，只改下面的 TALOS_YEAR_ONE_IN_TERRA 一处再跑一次：标注改成「＝泰拉历某年」，
 两编按换算后的年份排在同一根轴上（断开取消，间距照上面的规则算）。
 
-横向 x、y 按关联远近，力导向排布：
+横向 x、y 排成双螺旋，像 DNA：
+  - 每条条目的故事线（剧情组）和网页一样，取它引用的第一个剧情分集所属的组（主线、活动、故事集、终末地各类任务）。
+  - 故事线走在「股」上：股是绕中轴转的螺旋线，每 PERIOD 长转一圈。同一故事线隔得太远的条目（回忆里的旧事）
+    在 RUN_GAP 处断成几段，各段分别上股，免得一条线横跨几百年。主线一股（A），对面一股（B）给泰拉编的活动、
+    塔卫二编的角色任务，两股相对，就是双螺旋的两条主链；故事集、支线、区域任务、塔卫二编的活动走两条内股（C、D）。
+    同一股上时间重叠的几段并排成几道（lane），错开一点角度、往里收一点。网页把同一故事线前后相邻的条目沿股连起来。
+  - 没有故事线的（设定资料、档案、语音、物品题记、附记）是「碱基」：放在螺旋里面，靠向和它关联最强的那条故事线
+    所在的股；附近没有相关的，就落在两条主链之间的横档上。
+  - 截面半径随时间起伏：事件越密、同时进行的故事线越多，截面越粗；空旷的年代收细。按高斯核平滑，看起来是有机的。
   - 两条之间的关联 = 共有的人物（【人物】和 传:）、本末（事:）、故事线（剧情组）、地域（是岁、纲里的地名）
-    按稀有程度加权（越常见的越轻，如博士），再加上考异里互相引用（见 evXXXX）。
-  - 每条只连关联最强的 NEIGHBORS 条，彼此相吸；排斥只在 z 相距 REPEL_WINDOW 以内的条目之间算，所以很快；
-    中轴本身也推开靠得太近的点，没有关联的条目落在轴外一圈，不压在轴上。
-  - 网页悬停时画出的细线就是这里存的 rel（每条最多 REL_SHOWN 条）。
+    按稀有程度加权（越常见的越轻，如博士），再加上考异里互相引用（见 evXXXX）。网页悬停时画出的细线就是这里存的
+    rel（每条最多 REL_SHOWN 条）；碱基靠向哪股也按它定。
 """
 from __future__ import annotations
 
@@ -44,15 +53,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "site" / "data" / "annals.json"
 POWERS = ROOT / "site" / "data" / "powers.json"
+GROUPS = ROOT / "site" / "data" / "groups.json"
 OUT = ROOT / "site" / "data" / "timeline3d.json"
 
 # 塔罗斯历元年对应的泰拉历年份。原文未载，书中也不换算，所以是 None。
 # 官方给出对应时填一个数（如 1100），再运行本模块；网页的标注和两编的间距都随之改变。
 TALOS_YEAR_ONE_IN_TERRA: float | None = None
 
-# 管理员苏醒：书中那一条的 id（补条名）和它所在的年份
-AWAKENING_ID = "补:管理员苏醒于帝江号"
-AWAKENING_YEAR = 152
+# 两个起点：博士苏醒（泰拉编主线由此开始）、管理员苏醒（塔卫二编）。书中那一条的 id、年份、标注
+AWAKENINGS = [
+    {"id": "ev0501", "bian": "泰拉编", "year": 1096, "label": "博士苏醒", "when": "泰拉历一〇九六年十二月二十三日",
+     "lead": "罗德岛潜入切尔诺伯格，从「石棺」中救出博士，主线由此开始。"},
+    {"id": "补:管理员苏醒于帝江号", "bian": "塔卫二编", "year": 152, "label": "管理员苏醒", "when": "塔罗斯历一五二年春",
+     "lead": "管理员沉睡十年，醒于帝江号（一五二年是本编推定的当下）。"},
+]
+AWAKENING_IDS = {a["id"] for a in AWAKENINGS}
 
 # 纵轴
 PER_LAYER = 4          # 一层最多几条，多了按书中次序分层
@@ -68,11 +83,25 @@ BREAK_GAP = 12.0       # 两种历法之间的断开
 # 横向
 NEIGHBORS = 8          # 每条连几条最相关的
 REL_SHOWN = 6          # 悬停时画几条线
-REPEL_WINDOW = 4.0     # 排斥只算 z 相距这么近的
-ITERATIONS = 300
 SEED = "kezhoulu"
+PERIOD = 22.0          # 螺旋转一圈的轴长
+R_MIN, R_MAX = 2.8, 12.0   # 截面半径的范围（网页里的长度单位）
+SIGMA_DENSITY = 3.0    # 算事件密度的高斯核宽度
+RUN_GAP = 14.0         # 同一故事线前后两条相隔超过这么远（多是回忆里的旧事），股就断开，分成两段
+SIGMA_SMOOTH = 3.0     # 半径再平滑一遍
+RADIUS_DZ = 0.5        # 半径表的采样间距
+# 股：相位（弧度）和半径倍数。A、B 是两条主链，C、D 是内股
+SLOTS = {"A": (0.0, 1.0), "B": (math.pi, 1.0), "C": (math.pi / 2, 0.72), "D": (3 * math.pi / 2, 0.72)}
+# 故事线类别 → 依次可用的股；不在表里的类别（档案、语音、物品等）不上股，算碱基
+PREFER = {
+    "主线": "AC", "活动": "BDC", "故事集": "CDB",
+    "终末地·主线": "AC", "终末地·角色任务": "BD", "终末地·支线": "CD", "终末地·区域任务": "DC",
+    "终末地·活动": "DCB", "终末地·其他任务": "DC",
+}
+STORY_LINE = {"主线", "活动", "故事集"}  # 和网页 data.js 一致：泰拉编只认这三类，终末地的组都认
 
 TERRA, TALOS = "泰拉编", "塔卫二编"
+UNDATED = "不系年"     # 这一卷不上立体轴，见文件开头
 
 DIG = {"〇": 0, "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
 UNIT = {"十": 10, "百": 100, "千": 1000, "万": 10000}
@@ -147,14 +176,18 @@ def day_of(label: str | None) -> float:
 
 
 # ---------------------------------------------------------------------------------------------- 读编年史
-def load_entries(annals: dict, region_names: list[str], talos_regions: list[str] = ()) -> tuple[list[dict], list[dict]]:
+def load_entries(annals: dict, region_names: list[str], talos_regions: list[str] = (),
+                 ep_group: dict | None = None, category: dict | None = None) -> tuple[list[dict], list[dict]]:
     aliases = annals.get("aliases", {})
+    ep_group, category = ep_group or {}, category or {}
     entries, vols = [], []
     for vi, v in enumerate(annals["volumes"]):
         bian = v.get("bian") or TERRA
         year = v["year"]
         vol = {"index": vi, "year": year, "title": v["title"], "bian": bian, "n": 0}
-        vols.append(vol)
+        vols.append(vol)  # 下标要和卷号对上，所以不系年也登记，只是不取它的条目
+        if year == UNDATED:
+            continue
         for si, s in enumerate(v["sections"]):
             for d in s["days"]:
                 day = d.get("label")
@@ -174,11 +207,17 @@ def load_entries(annals: dict, region_names: list[str], talos_regions: list[str]
                     regions = {r for r in (region_names if bian == TERRA else [*region_names, *talos_regions]) if r in gang}
                     if day and not dated_day:
                         regions.add(day)
+                    # 故事线：和网页一样，先看引用的剧情分集属于哪个组，再看条目自己写的
+                    sids = [q["sid"] for g in e["groups"] for q in g.get("quotes", []) if q.get("type") == "story" and q.get("sid")]
+                    thread = next((t for t in [*(ep_group.get(x) for x in sids), *e.get("threads", [])]
+                                   if t and t != "lore" and (category.get(t) in STORY_LINE or t.startswith("ef_"))), None)
                     entries.append({
                         "id": e["id"], "ids": e.get("ids", []), "vol": vi, "year": year, "bian": bian,
                         "sec": si, "sec_label": s["label"], "day": day if dated_day else None,
                         "people": people, "zhuan": {aliases.get(n, n) for n in e.get("zhuan", [])},
-                        "benmo": set(e.get("benmo", [])), "threads": {t for t in e.get("threads", []) if t != "lore"},
+                        "benmo": set(e.get("benmo", [])),
+                        "threads": {t for t in [*e.get("threads", []), thread] if t and t != "lore"},
+                        "thread": thread, "cat": category.get(thread, ""),
                         "regions": regions, "refs": set(re.findall(r"ev\d{4}", "".join(text))),
                     })
     return entries, vols
@@ -220,7 +259,7 @@ def build_keys(entries: list[dict]) -> list[dict]:
     for i, e in enumerate(entries):
         band = band_of(e, deep)
         k = (e["vol"], e["sec"], e["day"]) if not band else (band,)
-        if keys and keys[-1]["k"] == k and e["id"] != AWAKENING_ID:  # 苏醒那一条另起一层，前后分得开
+        if keys and keys[-1]["k"] == k and e["id"] not in AWAKENING_IDS:  # 苏醒那一条另起一层，前后分得开
             keys[-1]["members"].append(i)
             continue
         single = isinstance(e["year"], int) or bool(re.match(r"^塔\d+$", str(e["year"])))
@@ -426,121 +465,201 @@ def neighbors(entries: list[dict], rel: list[dict[int, float]], k: int) -> list[
     return out
 
 
-# ---------------------------------------------------------------------------------------------- 横向布局
+# ---------------------------------------------------------------------------------------------- 横向布局：双螺旋
 def unit_hash(s: str) -> float:
     return zlib.crc32(f"{SEED}:{s}".encode("utf-8")) / 0xFFFFFFFF
 
 
-def layout(entries: list[dict], top: list[list[tuple[int, float]]]) -> tuple[list[float], list[float], int, int]:
-    n = len(entries)
-    # 起点：同一本末或同一故事线的从同一个方向出发，收敛快些
-    xs, ys = [], []
+def gauss_smooth(values: list[float], sigma_samples: float) -> list[float]:
+    w = int(3 * sigma_samples) + 1
+    kernel = [math.exp(-0.5 * (k / sigma_samples) ** 2) for k in range(-w, w + 1)]
+    out = []
+    for i in range(len(values)):
+        acc = norm = 0.0
+        for k, kv in zip(range(-w, w + 1), kernel):
+            j = i + k
+            if 0 <= j < len(values):
+                acc += values[j] * kv
+                norm += kv
+        out.append(acc / norm)
+    return out
+
+
+def radius_profile(entries: list[dict], length: float) -> dict:
+    """截面半径：事件密度（高斯核）和同时进行的故事线条数各占一份，按九五分位归一，平滑后映到 R_MIN..R_MAX。"""
+    z0 = -3.0
+    n = int((length + 6) / RADIUS_DZ) + 1
+    zs = [z0 + i * RADIUS_DZ for i in range(n)]
+    dens = [0.0] * n
+    reach = int(4 * SIGMA_DENSITY / RADIUS_DZ)
     for e in entries:
-        anchor = min(e["benmo"]) if e["benmo"] else min(e["threads"]) if e["threads"] else e["id"]
-        a = 2 * math.pi * unit_hash(anchor) + 0.6 * (unit_hash(e["id"]) - 0.5)
-        r = 1.0 + 0.4 * unit_hash(e["id"] + "r")
-        xs.append(r * math.cos(a))
-        ys.append(r * math.sin(a))
+        c = int(round((e["z"] - z0) / RADIUS_DZ))
+        for i in range(max(0, c - reach), min(n, c + reach + 1)):
+            dens[i] += math.exp(-0.5 * ((zs[i] - e["z"]) / SIGMA_DENSITY) ** 2)
+    spans: dict[str, list[float]] = {}
+    for e in entries:
+        if e["thread"]:
+            a = spans.setdefault(e["thread"], [e["z"], e["z"]])
+            a[0], a[1] = min(a[0], e["z"]), max(a[1], e["z"])
+    conc = [0.0] * n
+    for a, b in spans.values():
+        for i in range(max(0, int((a - 3 - z0) / RADIUS_DZ)), min(n, int((b + 3 - z0) / RADIUS_DZ) + 1)):
+            conc[i] += 1
 
-    # 相吸：对称的近邻图，强度随关联变强，随时间相隔变远而减弱
-    edges: dict[tuple[int, int], float] = {}
-    all_w = sorted(w for lst in top for _, w in lst)
-    half = all_w[len(all_w) // 2] if all_w else 1.0
-    for i, lst in enumerate(top):
-        for j, w in lst:
-            a, b = min(i, j), max(i, j)
-            s = w / (w + half) / (1 + abs(entries[i]["z"] - entries[j]["z"]) / 40)
-            edges[(a, b)] = max(edges.get((a, b), 0.0), s)
-    edge_list = [(a, b, s) for (a, b), s in sorted(edges.items())]
+    def norm(vals):
+        top = sorted(vals)[int(0.95 * (len(vals) - 1))] or 1.0
+        return [min(1.15, v / top) for v in vals]
 
-    # 排斥：z 固定，近邻对只算一次
-    order = sorted(range(n), key=lambda i: (entries[i]["z"], i))
-    pairs = []
-    for p in range(n):
-        i = order[p]
-        zi = entries[i]["z"]
-        for q in range(p + 1, n):
-            j = order[q]
-            dz = entries[j]["z"] - zi
-            if dz >= REPEL_WINDOW:
-                break
-            f = 1 - dz / REPEL_WINDOW
-            pairs.append((i, j, f * f))
+    d, c = norm([math.log1p(v) for v in dens]), norm(conc)
+    mix = gauss_smooth([0.62 * a + 0.38 * b for a, b in zip(d, c)], SIGMA_SMOOTH / RADIUS_DZ)
+    # 拉开对比：第五百分位收到最细，第九十五百分位撑到最粗
+    q = sorted(mix)
+    lo, hi = q[int(0.05 * (n - 1))], q[int(0.95 * (n - 1))]
+    r = [R_MIN + (R_MAX - R_MIN) * min(1.0, max(0.0, (v - lo) / ((hi - lo) or 1.0))) for v in mix]
+    return {"z0": z0, "dz": RADIUS_DZ, "r": [round(v, 3) for v in r]}
 
-    REPEL, ATTRACT, GRAVITY, AXIS = 0.05, 0.35, 0.25, 0.25
-    for it in range(ITERATIONS):
-        step = 0.25 * (1 - it / ITERATIONS) + 0.01
-        fx, fy = [0.0] * n, [0.0] * n
-        for i, j, f in pairs:
-            dx, dy = xs[i] - xs[j], ys[i] - ys[j]
-            d2 = dx * dx + dy * dy + 1e-3
-            k = REPEL * f / d2
-            fx[i] += dx * k
-            fy[i] += dy * k
-            fx[j] -= dx * k
-            fy[j] -= dy * k
-        for a, b, s in edge_list:
-            dx, dy = xs[b] - xs[a], ys[b] - ys[a]
-            k = ATTRACT * s
-            fx[a] += dx * k
-            fy[a] += dy * k
-            fx[b] -= dx * k
-            fy[b] -= dy * k
-        for i in range(n):
-            x, y = xs[i], ys[i]
-            r2 = x * x + y * y + 1e-3
-            # 拉回中轴，同时被中轴推开：孤立的点停在半径 sqrt(AXIS / GRAVITY) 的一圈上
-            gx = -GRAVITY * x + AXIS * x / r2
-            gy = -GRAVITY * y + AXIS * y / r2
-            tx, ty = fx[i] + gx, fy[i] + gy
-            d = math.hypot(tx, ty)
-            if d > step:
-                tx, ty = tx * step / d, ty * step / d
-            xs[i] = x + tx
-            ys[i] = y + ty
-    # 归一：九成五的点落在半径 1 以内
-    radii = sorted(math.hypot(x, y) for x, y in zip(xs, ys))
-    scale = 1 / (radii[int(0.95 * (n - 1))] or 1)
-    return [x * scale for x in xs], [y * scale for y in ys], len(pairs), len(edge_list)
+
+def radius_at(prof: dict, z: float) -> float:
+    t = (z - prof["z0"]) / prof["dz"]
+    i = max(0, min(len(prof["r"]) - 2, int(t)))
+    f = min(1.0, max(0.0, t - i))
+    return prof["r"][i] * (1 - f) + prof["r"][i + 1] * f
+
+
+def split_runs(entries: list[dict]) -> None:
+    """同一故事线按 RUN_GAP 断成几段，每条写上 run（「组 id#段号」）；不上股的类别 run 为 None。"""
+    by_thread: dict[str, list[int]] = {}
+    for i, e in enumerate(entries):
+        e["run"] = None
+        if e["thread"] and e["cat"] in PREFER:
+            by_thread.setdefault(e["thread"], []).append(i)
+    for t, idx in by_thread.items():
+        idx.sort(key=lambda i: entries[i]["z"])
+        k, prev = 0, None
+        for i in idx:
+            if prev is not None and entries[i]["z"] - prev > RUN_GAP:
+                k += 1
+            entries[i]["run"] = f"{t}#{k}"
+            prev = entries[i]["z"]
+
+
+LANE_SHIFT = [0.0, 0.32, -0.32, 0.64, -0.64, 0.96, -0.96, 1.2, -1.2]
+
+
+def assign_strands(entries: list[dict]) -> dict[str, tuple[float, float]]:
+    """每段分到一股：按类别依次试可用的股，挑当时空着的最靠外一道（lane）；同一道上时间不重叠。"""
+    spans: dict[str, list] = {}
+    for e in entries:
+        if e["run"]:
+            a = spans.setdefault(e["run"], [e["z"], e["z"], e["cat"], e["bian"]])
+            a[0], a[1] = min(a[0], e["z"]), max(a[1], e["z"])
+    lanes: dict[tuple[str, str], list[list[tuple[float, float]]]] = {}
+    out = {}
+    for run, (a, b, cat, bian) in sorted(spans.items(), key=lambda kv: (kv[1][0], kv[0])):
+        best = None
+        for rank, slot in enumerate(PREFER[cat]):
+            rows = lanes.setdefault((bian, slot), [])
+            lane = next((i for i, row in enumerate(rows) if all(y + 1.5 < a or b + 1.5 < x for x, y in row)), len(rows))
+            if best is None or (lane, rank) < best[0]:
+                best = ((lane, rank), slot, lane)
+        _, slot, lane = best
+        rows = lanes[(bian, slot)]
+        while len(rows) <= lane:
+            rows.append([])
+        rows[lane].append((a, b))
+        phase, k = SLOTS[slot]
+        li = min(lane, len(LANE_SHIFT) - 1)
+        out[run] = (phase + LANE_SHIFT[li], k * (1 - 0.05 * min(lane, 6)))
+    return out
+
+
+def helix_layout(entries: list[dict], top: list[list[tuple[int, float]]], length: float):
+    """返回 xs、ys、半径表、每条故事线的（相位，半径倍数）、每股主链的 z 范围。"""
+    prof = radius_profile(entries, length)
+    omega = 2 * math.pi / PERIOD
+    split_runs(entries)
+    strands = assign_strands(entries)
+    n = len(entries)
+    xs, ys = [0.0] * n, [0.0] * n
+
+    def at(phase, k, z, dr=0.0):
+        r = radius_at(prof, z) * k + dr
+        return r * math.cos(phase + omega * z), r * math.sin(phase + omega * z)
+
+    # 股上的条目：同一层的几条沿股左右排开
+    layer: dict[tuple[str, float], list[int]] = {}
+    for i, e in enumerate(entries):
+        if e["run"] in strands:
+            layer.setdefault((e["run"], e["z"]), []).append(i)
+    for (t, z), members in layer.items():
+        phase, k = strands[t]
+        m = len(members)
+        for j, i in enumerate(members):
+            off = (j - (m - 1) / 2) * 0.16
+            dr = 0.0 if m == 1 else (0.35 if j % 2 else -0.35)
+            xs[i], ys[i] = at(phase + off, k, z, dr)
+    # 碱基：靠向关联最强、时间相近的那条股上的条目所在的股；没有就落在两条主链之间的横档上
+    for i, e in enumerate(entries):
+        if e["run"] in strands:
+            continue
+        h1, h2 = unit_hash(e["id"] + "a"), unit_hash(e["id"] + "r")
+        near = next((j for j, _ in top[i] if entries[j]["run"] in strands and abs(entries[j]["z"] - e["z"]) <= 10), None)
+        if near is not None:
+            phase, k = strands[entries[near]["run"]]
+            xs[i], ys[i] = at(phase + (h1 - 0.5) * 0.7, k * (0.22 + 0.42 * h2), e["z"])
+        else:
+            side = (h2 - 0.5) * 1.15      # 横档上的位置：-0.575..0.575 倍半径
+            xs[i], ys[i] = at(0.0 + (h1 - 0.5) * 0.2, side, e["z"])
+    # 每编两条主链画在这一编第一条到最后一条之间
+    spans: dict[str, list[float]] = {}
+    for e in entries:
+        a = spans.setdefault(e["bian"], [e["z"], e["z"]])
+        a[0], a[1] = min(a[0], e["z"]), max(a[1], e["z"])
+    backbones = [{"bian": b, "z0": round(a - 1.5, 3), "z1": round(c + 1.5, 3)} for b, (a, c) in spans.items()]
+    return xs, ys, prof, omega, strands, backbones
 
 
 # ---------------------------------------------------------------------------------------------- 管理员苏醒
-def talos_year(e: dict) -> int | None:
+def entry_year(e: dict) -> int | None:
+    """这一条在自己历法里的年份：单年卷取卷年，合卷取小节标题里的年份；认不出（远古、年份不书）为 None。"""
+    if isinstance(e["year"], int):
+        return e["year"]
     m = re.match(r"^塔(\d+)$", str(e["year"]))
     if m:
         return int(m[1])
-    if e["sec_label"].startswith("塔罗斯历"):
-        return label_year(e["sec_label"])
-    return None
+    return label_year(e["sec_label"])
 
 
-def awakening_marks(entries: list[dict], keys: list[dict]) -> tuple[list, dict | None]:
-    """塔卫二编每条相对管理员苏醒的位置（泰拉编为 null），和轴上那一圈的位置。"""
-    at = next((i for i, e in enumerate(entries) if e["id"] == AWAKENING_ID), None)
-    if at is None:
-        return [None] * len(entries), None
-    wake, before, after = [], 0, 0
-    for i, e in enumerate(entries):
-        if e["bian"] != TALOS:
-            wake.append(None)
-        elif i == at:
-            wake.append("管理员苏醒")
-        elif i > at:
-            wake.append("苏醒后")
-            after += 1
-        else:
-            before += 1
-            y = talos_year(e)
-            wake.append("苏醒前 · 塔罗斯历以前" if e["sec_label"] == "塔罗斯历以前"
-                        else "苏醒前 · 年数不明" if y is None
-                        else "苏醒前 · 同年" if y >= AWAKENING_YEAR else f"苏醒前 {AWAKENING_YEAR - y} 年")
-    key = next(k for k in keys if at in k["members"])
-    return wake, {
-        "id": AWAKENING_ID, "z": round(key["z0"], 3), "year": AWAKENING_YEAR,
-        "label": "管理员苏醒", "when": "塔罗斯历一五二年春", "before": before, "after": after,
-        "note": f"管理员沉睡十年，醒于帝江号。塔卫二编以此为界：之前 {before} 条，之后 {after} 条；"
-                "之前的按书中年份标出苏醒前几年（一五二年是本编推定的当下）。",
-    }
+def awakening_marks(entries: list[dict], keys: list[dict]) -> tuple[list, list[dict]]:
+    """每条相对本编那一次苏醒的位置（书中次序在前为前、在后为后），和两次苏醒在轴上的位置。"""
+    wake = [None] * len(entries)
+    marks = []
+    for a in AWAKENINGS:
+        at = next((i for i, e in enumerate(entries) if e["id"] == a["id"]), None)
+        if at is None:
+            continue
+        before = after = 0
+        for i, e in enumerate(entries):
+            if e["bian"] != a["bian"]:
+                continue
+            y = entry_year(e)
+            if i == at:
+                wake[i] = a["label"]
+            elif i > at:
+                after += 1
+                wake[i] = "苏醒后" if y is None or y <= a["year"] else f"苏醒后 {y - a['year']} 年"
+            else:
+                before += 1
+                wake[i] = ("苏醒前 · 塔罗斯历以前" if e["sec_label"] == "塔罗斯历以前"
+                           else "苏醒前 · 年数不明" if y is None
+                           else "苏醒前 · 同年" if y >= a["year"] else f"苏醒前 {a['year'] - y} 年")
+        key = next(k for k in keys if at in k["members"])
+        marks.append({
+            "id": a["id"], "bian": a["bian"], "z": round(key["z0"], 3), "year": a["year"],
+            "label": a["label"], "when": a["when"], "before": before, "after": after,
+            "note": f"{a['lead']}{a['bian']}以此为界：之前 {before} 条，之后 {after} 条，每条标出苏醒前后几年。",
+        })
+    return wake, marks
 
 
 # ---------------------------------------------------------------------------------------------- 入口
@@ -553,13 +672,21 @@ def build(src: Path = SRC, out: Path = OUT, quiet: bool = False) -> dict:
         regions = [p for p in powers.values() if p.get("kind") == "region" and len(p["name"]) > 1]
         region_names = sorted({p["name"] for p in regions if p.get("game") != "endfield"})
         talos_regions = sorted({p["name"] for p in regions if p.get("game") == "endfield"})
-    entries, vols = load_entries(annals, region_names, talos_regions)
+    ep_group, category = {}, {}
+    if GROUPS.exists():
+        for g in json.loads(GROUPS.read_text(encoding="utf-8")):
+            category[g["id"]] = g["category"]
+            for ep in g["episodes"]:
+                ep_group[ep["id"]] = g["id"]
+    entries, vols = load_entries(annals, region_names, talos_regions, ep_group, category)
     keys = order_keys(build_keys(entries))
     axis = place_z(entries, keys)
     ticks, eras = ticks_for(entries, vols, keys)
     rel = relations(entries)
     top = neighbors(entries, rel, NEIGHBORS)
-    xs, ys, n_pairs, n_edges = layout(entries, top)
+    xs, ys, prof, omega, strands, backbones = helix_layout(entries, top, axis["length"])
+    thread_ids = sorted(strands)
+    thread_at = {t: i for i, t in enumerate(thread_ids)}
 
     epoch = next((k for k in keys if k["band"] is None and entries[k["members"][0]]["bian"] == TALOS), None)
     known = TALOS_YEAR_ONE_IN_TERRA is not None
@@ -573,9 +700,9 @@ def build(src: Path = SRC, out: Path = OUT, quiet: bool = False) -> dict:
                  + (f"据官方说法，塔罗斯历元年即泰拉历 {terra_year} 年，两编按此排在同一根轴上。" if known else
                     "原文没有说塔罗斯历元年是泰拉历哪一年，书中也不换算，所以两编之间断开，不按比例。")),
     }
-    wake, awakening = awakening_marks(entries, keys)
+    wake, awakenings = awakening_marks(entries, keys)
     data = {
-        "version": 1,
+        "version": 3,
         "count": len(entries),
         "scale": {
             "per_layer": PER_LAYER, "step_layer": STEP_LAYER, "step_day": STEP_DAY, "step_section": STEP_SECTION,
@@ -584,7 +711,7 @@ def build(src: Path = SRC, out: Path = OUT, quiet: bool = False) -> dict:
                     "两层之间隔一格，再按相隔年数取对数加一段。事多的年份拉长，空旷的年代压缩。",
         },
         "calendar": calendar,
-        "awakening": awakening,
+        "awakenings": awakenings,
         "length": round(axis["length"], 3),
         "breaks": [{"z0": round(a, 3), "z1": round(b, 3), "label": "断开 · 不按比例"} for a, b in axis["breaks"]],
         "bands": [{**b, "z0": round(b["z0"], 3), "z1": round(b["z1"], 3)} for b in axis["bands"]],
@@ -592,15 +719,26 @@ def build(src: Path = SRC, out: Path = OUT, quiet: bool = False) -> dict:
         "ticks": ticks,
         "ids": [e["id"] for e in entries],
         "z": [round(e["z"], 3) for e in entries],
-        "x": [round(x, 4) for x in xs],
-        "y": [round(y, 4) for y in ys],
+        "x": [round(x, 3) for x in xs],
+        "y": [round(y, 3) for y in ys],
+        "helix": {
+            "omega": round(omega, 6), "period": PERIOD, "radius": prof, "backbones": backbones,
+            "phases": [0.0, math.pi],
+            "threads": thread_ids,
+            "strand": [[round(strands[t][0], 4), round(strands[t][1], 4)] for t in thread_ids],
+            "text": "故事线走在绕中轴转的螺旋股上：主线一股，对面一股是泰拉编的活动、塔卫二编的角色任务，"
+                    "这两股是双螺旋的两条主链；故事集、支线、区域任务等走里面两股。没有故事线的设定、档案、附记"
+                    "放在螺旋里面，靠向和它关联最强的那条故事线。截面粗细随事件密度和同时进行的故事线条数起伏。",
+        },
+        "th": [thread_at.get(e["run"], -1) for e in entries],
         "rel": [[j for j, _ in lst[:REL_SHOWN]] for lst in top],
         "wake": wake,
     }
     out.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     if not quiet:
-        print(f"立体时间轴：{len(entries)} 条，轴长 {axis['length']:.0f}，排斥对 {n_pairs}，相吸 {n_edges}，"
-              f"{time.perf_counter() - t0:.1f} 秒 → {out.relative_to(ROOT)}")
+        on = sum(1 for e in entries if e["run"] in strands)
+        print(f"立体时间轴：{len(entries)} 条，轴长 {axis['length']:.0f}，{len(strands)} 段故事线上股（{on} 条），"
+              f"半径 {min(prof['r']):.1f}–{max(prof['r']):.1f}，{time.perf_counter() - t0:.1f} 秒 → {out.relative_to(ROOT)}")
     return data
 
 

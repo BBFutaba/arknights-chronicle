@@ -24,6 +24,7 @@ export function mount(el, r) {
   root = el;
   el.innerHTML = `
     <aside class="tl-side panel">
+      <div class="seg-ctrl t3-switch"><button class="active" aria-pressed="true">平面</button><a class="tl-to3d" href="#/timeline3d">立体</a></div>
       <label>编 <select class="tl-bian">${BIANS.map((b) => `<option>${esc(b)}</option>`).join('')}</select></label>
       <input class="tl-q" type="search" placeholder="筛选事件文字…">
       <div class="tl-toggles">
@@ -68,8 +69,9 @@ export function mount(el, r) {
     const a = e.target.closest('[data-row]');
     if (a) scroller.scrollTo({ top: headHeight() + Number(a.dataset.row) * ROW, behavior: 'smooth' });  // 这一行正好贴在吸顶的横轴下面
   });
-  // 换到立体视图时带上选中的事件（存目没有编年史条目，就用眼前第一条）
-  el.querySelector('.tl-head').addEventListener('click', (e) => {
+  // 换到立体视图（左栏的开关、页头的链接）时带上选中的事件（存目没有编年史条目，就用眼前第一条）。
+  // 不带编：立体视图本来就两编并轴
+  el.addEventListener('click', (e) => {
     const a = e.target.closest('.tl-to3d');
     const id = a && [selected, visible[0]?.id].map((x) => (D.annalsEntry[x] ? x : D.annalsByEvent[x])).find(Boolean);
     if (id) a.href = `#/timeline3d?${new URLSearchParams({ e: id })}`;
