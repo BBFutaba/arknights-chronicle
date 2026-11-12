@@ -17,6 +17,7 @@ dlg_a1m6d5_5_019 的 actorNameId=yuxiuli，actorName 解得「老俞{俞秀丽}�
 5. 前半是泛称（含「的」、问号、无线电/录音/职业等），后半是姓名：取后名。
 6. 两边均为姓名式称呼：取后面的全名，前称记为此人的别名；同一别名若指向多个
    正名则不全局归并（如「峰」的两种原文异写），避免无据合并。
+编者另定的个别例外在 SPEAKER_FIX（如「小橡{小祥」取画面称呼小橡，「塔塔{TA-TA原型机」并入原型机）。
 完整映射、导出剧本中的命中行数和规则写到 site/data/endfield-speakers.tsv；
 「？？？{亨德森}」等揭名据内部标记，编者应查表，不能视为场上已公开身份。
 选项用 decision，条件/跳转用 branch；并列分支全部展示，回边只显示跳转不展开。
@@ -57,6 +58,14 @@ def generic_speaker(name):
             or name.endswith(("声音", "呢喃", "系统", "语音播报器", "蚀影")))
 
 
+# 编者定的例外：画面称呼与剧中他人的称呼一致，内部名疑是异写，取画面称呼为正名
+SPEAKER_FIX = {
+    "小橡{小祥": ("小橡", "小祥", "编者定：画面与庄方宜都作小橡，取前称，内部名为别名"),
+    # 内部名带字母，按规则 1 会当成编号；它其实就是取名以前的说话人名
+    "塔塔{TA-TA原型机": ("TA-TA原型机", "塔塔", "编者定：陈千语为原型机取名塔塔，并为一人"),
+}
+
+
 def speaker_name(raw):
     """返回（规范名，姓名式别称或空串，审计规则）；不改变任何台词或行类型。"""
     raw = raw.strip("{}")
@@ -64,6 +73,8 @@ def speaker_name(raw):
         return raw, "", "原称"
     front, back = (s.strip() for s in raw.split("{", 1))
     back = back.rstrip("}")
+    if f"{front}{{{back}" in SPEAKER_FIX:
+        return SPEAKER_FIX[f"{front}{{{back}"]
     if re.search(r"[A-Za-z0-9_-]", back):
         return front, "", "内部编号：取前称"
     if re.search(r"[&＆、，,]", front + back) or "饰" in back:
