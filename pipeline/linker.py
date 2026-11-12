@@ -30,6 +30,8 @@ class Linker:
             for m in p.match:
                 add(m, "power", p.id)
         for ch in reg.chars.values():
+            if getattr(ch, "game", "") == "endfield":
+                continue
             if ch.kind == "npc" and char_lines[ch.name] >= NPC_MIN_LINES:
                 add(ch.name, "char", ch.name)
         add("博士", "char", reg.doctor.name)

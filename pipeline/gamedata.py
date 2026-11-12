@@ -325,7 +325,13 @@ def memory_set(grp: Group, n: int, part: int | None = None) -> list[Episode]:
 
 def sort_key(g: Group):
     """主线按章节号，活动、故事集和干员密录按开放时间。"""
-    order = CATEGORY_ORDER.index(g.category)
+    if getattr(g, "game", "") == "endfield":
+        categories = ["主线", "主线补遗", "角色任务", "支线", "区域任务", "活动", "人物交谈",
+                      "区域对话", "文献档案", "干员档案", "干员语音", "物品叙事", "过场字幕", "其他任务"]
+        category = g.category.removeprefix("终末地·")
+        order = categories.index(category) if category in categories else len(categories)
+        return (len(CATEGORY_ORDER), order, datetime.max.replace(tzinfo=CN_TZ), _natural(g.id))
+    order = CATEGORY_ORDER.index(g.category) if g.category in CATEGORY_ORDER else len(CATEGORY_ORDER)
     return (order, g.chapter if g.chapter is not None else 0, g.start or datetime.max.replace(tzinfo=CN_TZ), g.id)
 
 

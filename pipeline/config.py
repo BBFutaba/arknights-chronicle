@@ -11,6 +11,7 @@ RAW_REPO = ROOT / "data" / "raw" / "ArknightsGameData"
 GAMEDATA = RAW_REPO / "zh_CN" / "gamedata"
 EXCEL = GAMEDATA / "excel"
 STORY = GAMEDATA / "story"
+ENDFIELD = ROOT / "Raw Data" / "终末地" / "client" / "27010254"
 
 CURATED = ROOT / "data" / "curated"
 STRUCTURED = ROOT / "data" / "structured"

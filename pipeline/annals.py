@@ -200,7 +200,7 @@ def story_quote(args: str, where: str, probs: Problems) -> dict | None:
         return None
     sid, spec, rest = m.groups()
     chooser = re.search(r"选项=(\S+)", rest)
-    chooser = chooser.group(1) if chooser else "博士"
+    chooser = chooser.group(1) if chooser else ("终末地·管理员" if sid.startswith("ef_") else "博士")
     try:
         lines = lines_of(sid)
     except KeyError as e:
@@ -1586,7 +1586,12 @@ def show(sid: str, a: int | None = None, b: int | None = None):
     for i, ln in enumerate(lines_of(sid), 1):
         if (a and i < a) or (b and i > b):
             continue
+        if sid.startswith("ef_") and ln[0] == "b":
+            print(f"{i:4d} 〔分支：{line_text(ln)}〕")
+            continue
         if (t := show_line(ln)) is not None:
+            if sid.startswith("ef_") and ln[0] == "c":
+                t = "管理员（选项）：" + line_text(ln)
             print(f"{i:4d} {t}")
 
 
@@ -1666,6 +1671,8 @@ def raw_texts():
                     yield from walk(x, path)
         for path, v in walk(json.loads(f.read_text(encoding="utf-8")), f.stem):
             yield path, 0, v
+    from .endfield import raw_texts as endfield_raw_texts
+    yield from endfield_raw_texts()
 
 
 def rawfind(pattern: str, limit: int = 60):

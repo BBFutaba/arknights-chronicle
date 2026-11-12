@@ -81,6 +81,12 @@ class SiteExporter:
                 "date": g.start.strftime("%Y-%m-%d") if g.start else None,
                 "events": self.group_events.get(g.id, []), "episodes": eps,
             })
+            if getattr(g, "game", "") == "endfield":
+                out[-1]["game"] = "endfield"
+                out[-1]["description"] = g.description
+                for e, d in zip(eps, self.built[g.id]):
+                    e["source"] = d.ep.source
+                    e["order_note"] = d.ep.order_note
         return out
 
     def export_story(self, g: gamedata.Group) -> dict:
@@ -89,7 +95,10 @@ class SiteExporter:
             lines = []
             for l in d.script.lines:
                 k = LINE_KIND[l.kind]
-                lines.append([k, l.speaker or "", l.options if k == "c" else l.text])
+                speaker = l.speaker or ""
+                if getattr(g, "game", "") == "endfield" and "终末地·" + speaker in self.reg.chars:
+                    speaker = "终末地·" + speaker
+                lines.append([k, speaker, l.options if k == "c" else l.text])
             out[d.ep.story_id] = {"lines": lines, "backgrounds": d.script.backgrounds}
         return out
 
@@ -118,6 +127,8 @@ class SiteExporter:
                 "events": self.char_events.get(n, []),
                 "co": co[n].most_common(CO_TOP),
             }
+            if getattr(c, "game", "") == "endfield":
+                entry["game"] = "endfield"
             if c.kind == "operator":
                 entry["profile"] = profiles.operator_profile(c)
             elif desc := profiles.npc_description(n):
