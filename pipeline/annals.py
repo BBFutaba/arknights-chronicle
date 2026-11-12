@@ -1838,12 +1838,17 @@ def verify_quotes(out_path: str | None = None):
     probs = Problems()
     bad, total = [], 0
     raw_paths, tally = all_raw_files(), Counter()
-    for y in volume_years():
-        for e in load_volume(y, probs):
+    vols = [(y, load_volume(y, probs)) for y in volume_years()]
+    # 塔卫二编同季条目多，互相参见写「补条名」条；补条名不算短引
+    sup_names = {e.ids[0].removeprefix("补:") for _, es in vols for e in es if e.sup}
+    for y, es in vols:
+        for e in es:
             for g in e.groups:
                 fields = [("纲", g["gang"])] + [("目", t) for t in g["mu"]] + [("考异", k["text"]) for k in g["kaoyi"]]
                 for name, t in fields:
                     for q in re.findall(r"「([^「」]{4,})」", t):
+                        if q in sup_names:
+                            continue
                         pieces = [norm(x) for x in re.split(r"……|…", q)]
                         pieces = [x for x in pieces if len(x) >= 3]
                         if not pieces:
