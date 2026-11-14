@@ -18,6 +18,8 @@ from .config import ROOT
 
 SITE = ROOT / "site"
 DIST = ROOT / "dist"
+# 终末地解包的核对记录（客户端资源路径、说话人改写表），网页不读，只给编者看
+LOCAL_ONLY = ("endfield-audit.json", "endfield-speakers.tsv")
 
 
 def main() -> int:
@@ -28,7 +30,7 @@ def main() -> int:
         return 1
     if DIST.exists():
         shutil.rmtree(DIST)
-    shutil.copytree(SITE, DIST, ignore=shutil.ignore_patterns("stories"))
+    shutil.copytree(SITE, DIST, ignore=shutil.ignore_patterns("stories", *LOCAL_ONLY))
     path = DIST / "data" / "characters.json"
     chars = json.loads(path.read_text(encoding="utf-8"))
     n = 0
