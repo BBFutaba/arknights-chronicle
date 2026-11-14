@@ -51,6 +51,8 @@ from .script import Line, Script
 
 PREFIX = "终末地·"
 LORE = "图鉴与文案"  # 2026-11-12 盘点后补接的图鉴、文案，见 Loader.load_lore
+# 场景末尾附上对话树和时间轴都没接上的本场台词时的分支说明，见 Loader.load_dialogs
+SPARE_LINES = "以下按编号附对话表里归在本场、对话树和时间轴都没接上的台词，游戏里未必出现"
 
 
 def generic_speaker(name):
@@ -387,8 +389,12 @@ class Loader:
             all_objects = list(self.objects(asset))
             rows = [(p, d) for p, d in all_objects
                     if d.get("_trunkId") and "startTime" in d and not d.get("disableWhenLanguageIsCN")]
-            if not rows:
-                continue
+            # 简中版关掉的字幕（disableWhenLanguageIsCN）多半改作场景里的 3D 文字（Dialog3DTextPlayableAsset）：
+            # 它没有 startTime，时间取所在片段；同一句只收一次，已作字幕的不重收。
+            texts3d = [(p, d) for p, d in all_objects
+                       if d.get("_trunkId") and str(d.get("m_Name", "")).startswith("Dialog3DTextPlayableAsset")]
+            if not rows and not texts3d and not any(d.get("options") for _, d in all_objects):
+                continue  # 只有选项、没有台词的时间轴（如 e4m1d5_2）也要读
             gender = "女" if "/f_" in asset else "男" if "/m_" in asset else ""
             if len(assets) > 1:
                 out.append(Line("branch", "性别轨道：" + (gender or "通用")))
@@ -408,6 +414,13 @@ class Loader:
                 ident = int(p.stem.split("_")[1])
                 branch = clips.get(ident, [(row["startTime"], 0)])[0][1]
                 events.append((row["startTime"], p.name, branch, self.dialog(row["_trunkId"])))
+            shown = {row["_trunkId"] for _, row in rows}
+            placed = sorted((min(clips[int(p.stem.split("_")[1])]), p.name, row["_trunkId"]) for p, row in texts3d
+                            if int(p.stem.split("_")[1]) in clips)
+            for (start, branch), name, trunk in placed:
+                if trunk not in shown:
+                    shown.add(trunk)
+                    events.append((start, name, branch, self.dialog(trunk)))
             for ident, obj in objects.items():
                 if not obj.get("options") or ident not in clips:
                     continue
@@ -461,10 +474,11 @@ class Loader:
                 if isinstance(row.get("name"), str) and re.match(r"(?:[fm]_)?dlgtl_", row["name"]):
                     lines.extend(self.timeline(row["name"]))
                 if isinstance(row.get("key"), str) and row["key"].startswith("black_"):
-                    key = row["key"]
-                    if text := self.text(self.texts.get(key, {})):
+                    # 别用 key 作变量名：它是节点 id，下面要按它找出边（2026-11-13 前曾被覆盖，黑屏节点后的正文全丢）。
+                    black = row["key"]
+                    if text := self.text(self.texts.get(black, {})):
                         lines.append(Line("narration", text))
-                        self.used_black.add(key)
+                        self.used_black.add(black)
             lines.extend(self.decision(options))
             targets = edges[key]
             for i, target in enumerate(targets):
@@ -484,6 +498,7 @@ class Loader:
 
     def load_dialogs(self):
         summary_map, summaries = self.table("DialogSummaryMapTable"), self.table("DialogSummaryTable")
+        scenes = []
         for asset in sorted(self.assets, key=natural):
             if "/dialog/json/" not in asset:
                 continue
@@ -497,8 +512,24 @@ class Loader:
                 source = self.source(path)
                 lines = self.tree(data, source)
                 summary = self.text(summaries.get(summary_map.get(key), {}))
-                self.add(g, key, title + " · " + key, lines, summary or self.text(mission.get("missionDescription")),
-                         source, "场内依对话树/时间轴；场景在任务各环节间的触发先后未完全还原，目录仅按场景自然编号。")
+                scenes.append((g, key, title, lines, summary or self.text(mission.get("missionDescription")), source))
+        # 对话表里编号归在本场、对话树和时间轴都没用到的台词（树里没连上入口的节点、只配口型的语音、简中版关掉又没有
+        # 3D 文字的字幕、树里查不到的编号），按编号接在本场末尾，前加一行分支说明：不插进正文流程，已有行号不变。
+        # 要等所有场景读完再接，免得把别的场景会用到的台词先占了。
+        spare, spare_options = defaultdict(list), defaultdict(lambda: defaultdict(list))
+        for k in sorted(set(self.dialogs) - self.used_dialogs, key=natural):
+            spare[re.sub(r"_\d+$", "", k)].append(k)
+        for k in sorted(set(self.options) - self.used_options, key=natural):
+            if m := re.fullmatch(r"option_(.+)_(\d+)_\d+", k):  # option_<场景>_<选项组>_<序号>
+                spare_options[m[1]][m[2]].append(k)
+        for g, key, title, lines, synopsis, source in scenes:
+            extra = [line for k in spare.pop(key, []) for line in self.dialog(k)]
+            extra += [line for _, keys in sorted(spare_options.pop(key, {}).items(), key=lambda kv: int(kv[0]))
+                      for line in self.decision(keys)]
+            if extra:
+                lines = lines + [Line("branch", SPARE_LINES)] + extra
+            self.add(g, key, title + " · " + key, lines, synopsis, source,
+                     "场内依对话树/时间轴；场景在任务各环节间的触发先后未完全还原，目录仅按场景自然编号。")
 
     def load_radio(self):
         for key, row in sorted(self.table("RadioTable").items(), key=lambda x: natural(x[0])):
@@ -750,6 +781,22 @@ class Loader:
             (t(r.get("name")) or k, [s for s in (t(r.get("desc"), breaks=True), t(r.get("tips"), breaks=True)) if s])
             for k, r in sorted(self.table("ActivityTable").items(), key=lambda x: natural(x[0]))], 30,
             "TableCfg/ActivityTable.json")
+
+        # 2026-11-13 第二次盘点：对话树和时间轴都没用到的台词与选项。同日修好对话树解析、接上 3D 文字，
+        # 有对话树的场景剩下的台词也接到了本场末尾（见 load_dialogs），这里只剩客户端里根本没有对话树和
+        # 时间轴的场景（多是未上线、被删或旧稿）。按编号前缀聚成一段，作旁白「说话人：台词」，不记出场。
+        pieces = defaultdict(list)
+        for k in sorted(set(self.dialogs) - self.used_dialogs, key=natural):
+            r = self.dialogs[k]
+            text, who = t(r.get("dialogText"), breaks=True), t(r.get("actorName"))
+            if text:
+                pieces[re.sub(r"_\d+$", "", k)].append(f"{who}：{text}" if who else text)
+        for k in sorted(set(self.options) - self.used_options, key=natural):
+            text = t(self.options[k].get("optionText"))
+            if text:
+                pieces[re.sub(r"_\d+$", "", k.removeprefix("option_"))].append("（选项）" + text)
+        self.lore_page("lore_orphan_dialogs", "未入对话树的台词", sorted(pieces.items(), key=lambda kv: natural(kv[0])), 30,
+                       "TableCfg/DialogTextTable.json; TableCfg/DialogOptionTable.json")
 
     def load_subtitles(self):
         """字幕和未定位的黑屏文本独立成集，不拼到任务中猜测播放位置。"""
