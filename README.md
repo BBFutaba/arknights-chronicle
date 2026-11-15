@@ -22,7 +22,7 @@
 ## 数据来源与版权
 
 - 剧本、干员档案、敌人图鉴：[Kengxxiao/ArknightsGameData](https://github.com/Kengxxiao/ArknightsGameData)，版权归鹰角网络。
-- 人物页的干员立绘和头像：[yuanyan3060/ArknightsGameResource](https://github.com/yuanyan3060/ArknightsGameResource)、[555me/EndfieldAssets](https://github.com/555me/EndfieldAssets)，版权归鹰角网络；图不进仓库，由 `pipeline.images` 下载到本地，只随公开版网页发布。
+- 人物页的干员立绘和头像：[yuanyan3060/ArknightsGameResource](https://github.com/yuanyan3060/ArknightsGameResource)、[555me/EndfieldAssets](https://github.com/555me/EndfieldAssets)，版权归鹰角网络；图不进仓库，只随公开版网页发布。
 - 参考的年表：[PRTS「泰拉年表」](https://prts.wiki/w/泰拉年表)，CC BY-NC-SA 4.0。日期是社区根据剧情推测的，可能有偏差。
 - 编者文字：纲、目、考异、纪事本末、列传和博物志的正文，按 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 发布，转载和再创作的约定见网页的「鸣谢与协议」页。
 
@@ -37,14 +37,13 @@
 
 ## 使用
 
-需要 Python 3.12+、git 和 curl，不依赖第三方 Python 库。所有命令在项目根目录运行。
+需要 Python 3.12+，不依赖第三方 Python 库。所有命令在项目根目录运行。
+
+仓库只有网页代码、构建脚本和书稿，不含游戏数据。构建前要在本地准备好 `data/raw/`（git 忽略）：`ArknightsGameData/zh_CN/gamedata/` 下的 `story/` 和 `excel/`（来自上文的 ArknightsGameData），以及 PRTS「泰拉年表」页面源码的缓存 `prts/泰拉年表.json`。塔卫二编还要终末地客户端的解包文本，放在 `Raw Data/终末地/client/`（同样 git 忽略），没有时跳过终末地剧情。人物页的立绘和头像放在 `site/img/`，没有也能构建。
 
 ```bash
-python -m pipeline.fetch     # 下载或更新游戏数据（约 320MB）；PRTS 年表已有缓存就不再抓取
-python -m pipeline.images    # 可选：下载干员立绘和头像，缩成 site/img/ 下的 webp（要 Pillow，在 build 之前运行）
 python -m pipeline.build     # 解析全部剧情和年表，生成 site/data/
 python -m pipeline.serve     # 在 http://127.0.0.1:8765 打开浏览器
-python -m pipeline.check     # 年表出处对应情况、网页数据引用检查、需要人工处理的说话人
 ```
 
 ### 公开版
@@ -63,7 +62,6 @@ python -m pipeline.deploy           # 发布当前提交：推送 main，更新 
 
 - 卷稿在 `data/annals/<年份>/`（一〇八〇年以前合为 `外纪`、`前纪甲`、`前纪乙`、`前纪丙`，原文和年表都无年份的放 `不系年`）。列传在 `列传.md`，纪事本末在 `纪事本末.md`，博物志在 `博物志/`。
 - 引文只写出处指令（分集 id + 行号 + 锚点），不写原文；构建时程序从剧本里取出原文并核对锚点。导出的 `site/data/` 和 `annals/<年份>.md` 含剧本原文，不提交。
-- 体例和写法见 `data/annals/写作规范.md`，另有 `博物志须知.md`、`列传索引须知.md`；进度和待改进事项见 `路线图.md`。
 
 ```bash
 python -m pipeline.annals build                   # 检查并导出编年史和博物志（pipeline.build 结束时也会运行）
@@ -77,12 +75,13 @@ python -m pipeline.annals                         # 列出全部子命令
 
 ```
 pipeline/
-  fetch.py build.py check.py serve.py             命令入口，见「使用」
+  build.py serve.py                               命令入口，见「使用」
   gamedata.py script.py entities.py analyze.py    读游戏数据，解析剧本，归一说话人，统计每集出场
-  prts.py chronicle.py linker.py                  PRTS 年表：抓取、解析，对应出处、人物和地区势力
-  profiles.py site.py                             干员档案和 NPC 简介；导出 site/data/*.json
-  annals.py timeclues.py                          编年史和博物志：查剧本、取引文、校验、导出；提取时间线索
-  publish.py bundle.py deploy.py                  公开版；单文件版；上线
+  lore.py endfield.py                             设定文本；终末地剧情和图鉴
+  prts.py chronicle.py linker.py                  PRTS 年表：读缓存、解析，对应出处、人物和地区势力
+  profiles.py site.py timeline3d.py               干员档案和 NPC 简介；导出 site/data/*.json；立体时间轴
+  annals.py                                       编年史和博物志：查剧本、取引文、校验、导出
+  publish.py bundle.py deploy.py chrome_font.py   公开版；单文件版；上线；界面字体子集
 data/
   annals/          书稿（只含出处指令和短引，不含全文）
   curated/entities.toml  人工维护：别名、同名区分、路人过滤、单字名字、补充的地区势力
@@ -107,19 +106,19 @@ site/
 
 - 隐藏剧情游戏里没有关卡代号，按 PRTS 的写法编作 `NL-HD-1` 等，分集类型记作「幕间」。目前只有《长夜临光》的「逃离」「选择」「路漫漫」三篇。
 - 教程、训练和关卡内对话不进剧情分类，归在设定文本的「教程、引导与小游戏对白」（`lore_tutorial`）。
-- 这是剧本库的范围，比书宽；入不入书看写作规范，如联动活动不入正史。
+- 这是剧本库的范围，比书宽；入不入书由编者定，如联动活动不入正史。
 
 ## 进度
 
 - 剧本库 2,809 集：主线 429、活动 1,104（含隐藏剧情 3）、故事集 132、干员密录 399、集成战略 260、生息演算 270、其他文本 215；另有设定文本 2,429 集（约 365 万字），终末地 · 图鉴与文案 503 集（约 38 万字）。
-- 泰拉编 29 卷 1111 条（附记 391），列传 286 篇，纪事本末 37 件，博物志 372 条；塔卫二编 2 卷 246 条（附记 33），列传 36 篇，纪事本末 6 件，博物志 100 条，已对照原文核对（未核完的部分见 `data/annals/路线图.md`）。
+- 泰拉编 29 卷 1111 条（附记 391），列传 286 篇，纪事本末 37 件，博物志 372 条；塔卫二编 2 卷 246 条（附记 33），列传 36 篇，纪事本末 6 件，博物志 100 条，已对照原文核对。
 
-待办（书稿的细项见路线图）：
+待办：
 
-- [ ] 加入《明日方舟：终末地》的时间线
+- [x] 加入《明日方舟：终末地》的时间线（塔卫二编）
 - [ ] 平行时间线（PRTS「泰拉年表/平行时间线」）
 - [ ] 同名 NPC、说话人别名的全面人工审核（目前逐案处理）
 
 ## 贡献
 
-欢迎勘误、补遗、校对和改代码，提 [issue](https://github.com/BBFutaba/arknights-chronicle/issues) 或 PR。改书稿前先看 `data/annals/写作规范.md`，改完跑 `python -m pipeline.annals build`，不能有 `!`；不要提交剧本全文和书外材料的全文。贡献的内容按上文的协议发布，贡献者署名在 `data/annals/鸣谢与协议.md`。
+欢迎勘误、补遗、校对和改代码，提 [issue](https://github.com/BBFutaba/arknights-chronicle/issues) 或 PR。改完书稿跑 `python -m pipeline.annals build`，不能有 `!`；不要提交剧本全文和书外材料的全文。贡献的内容按上文的协议发布，贡献者署名在 `data/annals/鸣谢与协议.md`。
